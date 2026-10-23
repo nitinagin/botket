@@ -60,7 +60,7 @@ byId('skillsRobotSummary').textContent=mine.length?mine.length+' local demo robo
 byId('skillcards').innerHTML=skills.map(x=>card(x,'<p class="muted">Compatibility not verified</p><button disabled>Install unavailable</button>')).join('');
 byId('servicecards').innerHTML=services.map(x=>card(x,'<button class="buy" data-add="'+x.id+'">Add demo service</button>')).join('');
 renderCart();
-document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const x=[...robots,...services].find(y=>y.id===b.dataset.add);cart.push(x);show('cart')});
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const x=[...robots,...services].find(y=>y.id===b.dataset.add);cart.push(x);byId('result').textContent='Cart updated. Preview again to continue. No order was placed.';show('cart')});
 document.querySelectorAll('[data-robot]').forEach(b=>b.onclick=()=>{const x=robots.find(y=>y.id===b.dataset.robot);addDemoRobot(x.name,'BOTKET sample catalog',x.name)});}
 function show(tab){document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['store','robots','skills','services','cart'].forEach(id=>byId(id).hidden=id!==tab);render()}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
