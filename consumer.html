@@ -69,6 +69,7 @@ byId('openSkillsFromRobots').onclick=()=>show('skills');
 byId('openServicesFromSkills').onclick=()=>show('services');
 document.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{selectedCategory=b.dataset.category;document.querySelectorAll('[data-category]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render()}));
 byId('registerRobot').addEventListener('submit',e=>{e.preventDefault();const name=byId('robotNickname').value.trim(),brand=byId('robotBrand').value.trim(),model=byId('robotModel').value.trim();if(!name||!brand||!model){byId('robotMessage').textContent='Complete all three fields.';return}addDemoRobot(name,brand,model);e.target.reset()});
+byId('name').addEventListener('input',()=>{if(!byId('checkoutToRobots').hidden){byId('checkoutToRobots').hidden=true;byId('result').textContent='Name changed. Preview again to continue.'}});
 byId('preview').onclick=()=>{const name=byId('name').value.trim(),ready=Boolean(cart.length&&name);byId('result').textContent=ready?'Preview for '+name+': '+cart.length+' item(s), '+money(cart.reduce((a,x)=>a+x.price,0))+'. No payment or order submission occurred.':'Add an item and enter your name.';byId('checkoutToRobots').hidden=!ready};
 byId('checkoutToRobots').onclick=()=>show('robots');
 byId('clearCart').onclick=()=>{cart=[];byId('result').textContent='Cart cleared. No order was placed.';renderCart()};
