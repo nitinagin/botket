@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BOTKET Consumer Demo</title>
+<style>body{font:16px system-ui;margin:0;background:#f4f8f5;color:#193321}header{background:white;padding:20px;border-bottom:1px solid #ddd}main{max-width:900px;margin:auto;padding:25px}h1{font-size:38px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button,button{padding:12px;border:0;border-radius:10px;cursor:pointer}.tabs button{background:#e4efe7}.tabs button.active,.buy{background:#087d3c;color:white}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0}.card{background:white;border-radius:15px;padding:20px;border:1px solid #dae8df}.muted{color:#68786d}section[hidden]{display:none}input{padding:10px;border:1px solid #ccc;border-radius:8px}</style>
+</head><body>
+<header><strong style="color:#087d3c;font-size:25px">BOTKET</strong> · Personal Robotics Platform</header>
+<main><h1>Discover. Buy. Connect.</h1><p>Personal robots, skills and services in one app.</p><p class="muted">Prototype only: sample listings and prices; no live orders, payments, verified compatibility or device connections.</p>
+<nav class="tabs"><button class="active" data-tab="store">Store</button><button data-tab="robots">My Robots</button><button data-tab="skills">Skills</button><button data-tab="services">Services</button><button data-tab="cart">Checkout (<span id="count">0</span>)</button></nav>
+<section id="store"><h2>Explore robots</h2><div class="grid" id="products"></div></section>
+<section id="robots" hidden><h2>My Robots</h2><div id="myrobots" class="grid"></div></section>
+<section id="skills" hidden><h2>Skills</h2><div class="grid" id="skillcards"></div></section>
+<section id="services" hidden><h2>Services</h2><div class="grid" id="servicecards"></div></section>
+<section id="cart" hidden><h2>Demo checkout</h2><div class="card"><div id="items"></div><h3 id="total"></h3><label>Customer name <input id="name"></label><p><button class="buy" id="preview">Preview order</button></p><p id="result" aria-live="polite"></p></div></section>
+</main><script>
+const robots=[{id:'r1',name:'Home Robot Concept',price:34900},{id:'r2',name:'Companion Robot Concept',price:24900}],skills=[{name:'Home Patrol',price:199},{name:'Object Delivery',price:299}],services=[{id:'s1',name:'Robot Setup',price:1500},{id:'s2',name:'Maintenance',price:1300}];let cart=[],mine=[];
+const money=n=>'฿'+n.toLocaleString('en-US');const byId=id=>document.getElementById(id);
+function card(x,action){return '<article class="card"><h3>'+x.name+'</h3><p>'+money(x.price)+' · Illustrative price</p>'+action+'</article>'}
+function render(){byId('products').innerHTML=robots.map(x=>card(x,'<button class="buy" data-add="'+x.id+'">Add to cart</button> <button data-robot="'+x.id+'">Demo device</button>')).join('');
+byId('myrobots').innerHTML=mine.length?mine.map(x=>'<article class="card"><h3>'+x.name+'</h3><p class="muted">Demo only · Not connected</p><button disabled>Control unavailable</button></article>').join(''):'<p>No demo robots added.</p>';
+byId('skillcards').innerHTML=skills.map(x=>card(x,'<p class="muted">Compatibility not verified</p><button disabled>Install unavailable</button>')).join('');
+byId('servicecards').innerHTML=services.map(x=>card(x,'<button class="buy" data-add="'+x.id+'">Add demo service</button>')).join('');
+byId('items').textContent=cart.length?cart.map(x=>x.name+' — '+money(x.price)).join(' | '):'Your cart is empty';
+byId('total').textContent='Total: '+money(cart.reduce((a,x)=>a+x.price,0));byId('count').textContent=cart.length;
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const x=[...robots,...services].find(y=>y.id===b.dataset.add);cart.push(x);show('cart')});
+document.querySelectorAll('[data-robot]').forEach(b=>b.onclick=()=>{const x=robots.find(y=>y.id===b.dataset.robot);if(!mine.some(y=>y.id===x.id))mine.push(x);show('robots')});}
+function show(tab){document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['store','robots','skills','services','cart'].forEach(id=>byId(id).hidden=id!==tab);render()}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+byId('preview').onclick=()=>{byId('result').textContent=cart.length&&byId('name').value.trim()?'Demo order preview only. No payment or submission occurred.':'Add an item and enter your name.'};render();
+</script></body></html>
