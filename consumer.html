@@ -75,6 +75,6 @@ byId('name').addEventListener('input',()=>{if(!byId('checkoutToRobots').hidden){
 byId('preview').onclick=()=>{const name=byId('name').value.trim();if(cart.length&&!name){byId('checkoutToRobots').hidden=true;byId('result').textContent='Enter a customer name to preview this demo order. No order was placed.';byId('name').focus();return}const ready=Boolean(cart.length&&name);const robotCount=cart.filter(x=>robots.some(r=>r.id===x.id)).length,serviceCount=cart.length-robotCount;byId('result').textContent=ready?'Preview for '+name+': '+robotCount+' robot concept(s), '+serviceCount+' service preview(s), total '+money(cart.reduce((a,x)=>a+x.price,0))+'. No payment or order submission occurred.':'Add an item and enter your name.';byId('checkoutToRobots').hidden=!ready};
 byId('checkoutToRobots').onclick=()=>show('robots');
 byId('browseFromCheckout').onclick=()=>show(lastBrowseTab);
-byId('clearCart').onclick=()=>{cart=[];byId('result').textContent='Cart cleared. No order was placed.';renderCart();const browse=byId('items').querySelector('[data-cart-browse]');if(browse)browse.focus()};
+byId('clearCart').onclick=()=>{if(!cart.length||!window.confirm('Clear all '+cart.length+' demo cart item(s)?'))return;cart=[];byId('result').textContent='Cart cleared. No order was placed.';renderCart();const browse=byId('items').querySelector('[data-cart-browse]');if(browse)browse.focus()};
 render();
 </script></body></html>
