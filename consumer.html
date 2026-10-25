@@ -9,6 +9,8 @@
 .concept-actions button{flex:1 1 150px;min-height:44px}
 /* BOTKET mobile navigation v1 */
 @media (max-width: 640px) {
+  /* Keep the footer and its Academy link above the fixed mobile navigation. */
+  body { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   main { padding: 20px 16px 116px; }
   .tabs {
     position: fixed;
