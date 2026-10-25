@@ -72,7 +72,7 @@ function show(tab,focusHeading=false){if(tab==='store'||tab==='services')lastBro
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>show(b.dataset.tab,true));
 byId('skillRobotSelect').addEventListener('change',e=>{selectedRobotId=e.target.value||null;updateSkillsRobotSummary()});
 byId('openRobotsFromSkills').onclick=()=>show('robots');
-byId('openSkillsFromRobots').onclick=()=>{selectedRobotId=null;show('skills')};
+byId('openSkillsFromRobots').onclick=()=>show('skills');
 byId('openServicesFromSkills').onclick=()=>show('services');
 byId('openRobotsFromServices').onclick=()=>show('robots');
 document.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{selectedCategory=b.dataset.category;document.querySelectorAll('[data-category]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render()}));
