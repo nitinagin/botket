@@ -952,3 +952,68 @@ test('robot concept to checkout to local profile to skills to services stays dem
   assert.equal(saves, 1, 'Checkout and service previews never write robot profiles');
   assert.match(page, /No bookings, service requests or payments are available/);
 });
+
+test('Discover concept search combines category filters, normalized terms and accessible clearing', () => {
+  assert.match(page, /id="robotSearch" type="search"[^>]*aria-describedby="filterSummary"/);
+  assert.match(page, /id="clearRobotSearch" hidden aria-label="Clear robot concept search"/);
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
+  const clearSource = app.match(/byId\('clearRobotSearch'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const escapeSource = app.match(/byId\('robotSearch'\)\.addEventListener\('keydown',(e=>\{[^\n]*\})\);/);
+  assert.ok(source && clearSource && escapeSource, 'Expected Discover search, clear and Escape handlers');
+
+  const catalog = [
+    { id: 'r1', name: 'Home Robot Concept', category: 'home' },
+    { id: 'r2', name: 'Companion Robot Concept', category: 'companion' },
+    { id: 'r3', name: 'Educational Robotics Kit Concept', category: 'education' }
+  ];
+  const elements = {
+    robotSearch: { value: '  HOME    ROBOT ', focused: false, focus() { this.focused = true; } },
+    clearRobotSearch: { hidden: true },
+    filterSummary: { textContent: '' },
+    products: { innerHTML: '' },
+    skillcards: { innerHTML: '' },
+    servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: catalog, skills: [], services: [], selectedCategory: 'all',
+    byId: id => elements[id],
+    card: x => '<article>' + x.name + '</article>',
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, renderCart: () => {},
+    document: { querySelectorAll: () => [] }
+  };
+  const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
+  const clear = new Script('(' + clearSource[1] + ')').runInNewContext({ byId: context.byId, render });
+  const onKey = new Script('(' + escapeSource[1] + ')').runInNewContext({ byId: context.byId, render });
+  render();
+  assert.match(elements.products.innerHTML, /Home Robot Concept/);
+  assert.doesNotMatch(elements.products.innerHTML, /Companion Robot Concept/);
+  assert.match(elements.filterSummary.textContent, /Showing 1 of 3/);
+  assert.equal(elements.clearRobotSearch.hidden, false);
+
+  context.selectedCategory = 'education';
+  render();
+  assert.match(elements.products.innerHTML, /No robot concepts match/);
+  assert.match(elements.filterSummary.textContent, /Showing 0 of 3 robot concepts in education/);
+
+  elements.robotSearch.value = '  educational   KIT ';
+  render();
+  assert.match(elements.products.innerHTML, /Educational Robotics Kit Concept/);
+  assert.doesNotMatch(elements.products.innerHTML, /Home Robot Concept/);
+
+  clear();
+  assert.equal(elements.robotSearch.value, '');
+  assert.equal(elements.robotSearch.focused, true);
+  assert.equal(elements.clearRobotSearch.hidden, true);
+  assert.match(elements.filterSummary.textContent, /Showing 1 of 3 robot concepts in education/);
+
+  context.selectedCategory = 'all';
+  elements.robotSearch.value = 'companion';
+  let prevented = 0;
+  onKey({ key: 'Enter', preventDefault() { prevented++; } });
+  assert.equal(elements.robotSearch.value, 'companion');
+  onKey({ key: 'Escape', preventDefault() { prevented++; } });
+  assert.equal(elements.robotSearch.value, '');
+  assert.equal(prevented, 1);
+  assert.match(elements.filterSummary.textContent, /Showing 3 of 3 robot concepts/);
+  assert.equal(catalog.length, 3, 'Filtering never modifies the concept catalog');
+});
