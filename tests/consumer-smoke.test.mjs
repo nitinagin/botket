@@ -205,3 +205,53 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.equal(elements.name.value, '');
   assert.match(elements.result.textContent, /Cart cleared\. No order was placed/i);
 });
+
+test('demo robot profile registration selects new profiles and protects duplicates and the limit', () => {
+  const source = app.match(/function addDemoRobot\(name,brand,model\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the demo profile registration function');
+  const elements = { profileSearch: { value: 'old filter' }, robotMessage: { textContent: '' } };
+  let nextId = 0;
+  let destination;
+  const context = {
+    mine: [], selectedRobotId: null,
+    byId: id => elements[id],
+    demoId: () => 'demo-' + ++nextId,
+    saveRobots: () => true,
+    show: tab => { destination = tab; }
+  };
+  const add = new Script('(' + source[0] + ')').runInNewContext(context);
+
+  assert.equal(add('Study Robot', 'Example Maker', 'Model A'), true);
+  assert.equal(context.mine.length, 1);
+  assert.equal(context.selectedRobotId, 'demo-1');
+  assert.equal(elements.profileSearch.value, '', 'Saving reveals the new profile');
+  assert.equal(destination, 'robots');
+  assert.match(elements.robotMessage.textContent, /compatibility not verified/i);
+
+  assert.equal(add(' study   robot ', 'EXAMPLE MAKER', 'model a'), false);
+  assert.equal(context.mine.length, 1, 'Normalized duplicate must not be saved');
+  assert.equal(context.selectedRobotId, 'demo-1', 'Duplicate preserves selection');
+  assert.match(elements.robotMessage.textContent, /already saved/i);
+
+  for (let i = 1; i < 30; i++) {
+    assert.equal(add('Robot ' + i, 'Example Maker', 'Model A'), true);
+  }
+  assert.equal(context.mine.length, 30);
+  const selectedAtLimit = context.selectedRobotId;
+  assert.equal(add('Robot 31', 'Example Maker', 'Model A'), false);
+  assert.equal(context.mine.length, 30);
+  assert.equal(context.selectedRobotId, selectedAtLimit);
+  assert.match(elements.robotMessage.textContent, /limit: 30 profiles/i);
+
+  const session = {
+    mine: [], selectedRobotId: null,
+    byId: id => elements[id],
+    demoId: () => 'session-only',
+    saveRobots: () => false,
+    show: () => {}
+  };
+  const addSession = new Script('(' + source[0] + ')').runInNewContext(session);
+  assert.equal(addSession('Offline', 'Example Maker', 'Model B'), true);
+  assert.equal(session.selectedRobotId, 'session-only');
+  assert.match(elements.robotMessage.textContent, /will not survive a reload/i);
+});
