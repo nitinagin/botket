@@ -135,3 +135,73 @@ test('demo cart add handler rejects duplicates, unknown items and the 20-item li
   assert.equal(cart.length, 20, 'Cart must not exceed the demo limit');
   assert.match(result.textContent, /limit reached/i);
 });
+
+test('demo cart remove and clear handlers keep totals and preview state consistent', () => {
+  const renderSource = app.match(/function renderCart\(\)\{[^\n]*\}/);
+  const clearSource = app.match(/byId\('clearCart'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(renderSource && clearSource, 'Expected both cart handlers');
+  let focused;
+  const node = () => ({
+    children: [], attributes: {},
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    querySelectorAll(selector) {
+      const key = selector.slice(1, -1);
+      return this.children.flatMap(item => [item, ...(item.children || [])])
+        .filter(item => Object.hasOwn(item.attributes || {}, key));
+    },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; },
+    focus() { focused = this; }
+  });
+  const elements = Object.fromEntries(
+    ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
+      'preview', 'checkoutToRobots', 'name', 'result'].map(id => [id, node()])
+  );
+  const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
+  const service = { id: 's1', name: 'Service Preview', price: 1500 };
+  let confirmed = false;
+  const context = {
+    cart: [robot, service], robots: [robot], services: [service],
+    lastBrowseTab: 'store', byId: id => elements[id],
+    money: n => '฿' + n.toLocaleString('en-US'),
+    document: { createElement: node },
+    window: { confirm: () => confirmed },
+    show: () => {}
+  };
+  context.renderCart = new Script('(' + renderSource[0] + ')').runInNewContext(context);
+  const render = () => context.renderCart();
+  elements.name.value = 'Guest nickname';
+  elements.checkoutToRobots.hidden = false;
+  render();
+  assert.equal(elements.total.textContent, 'Total: ฿36,400');
+  assert.equal(elements.count.textContent, 2);
+  assert.equal(elements.checkoutToRobots.hidden, true);
+
+  elements.items.children[0].children[1].onclick();
+  assert.deepEqual(context.cart.map(item => item.id), ['s1']);
+  assert.equal(elements.total.textContent, 'Total: ฿1,500');
+  assert.equal(elements.count.textContent, 1);
+  assert.equal(focused, elements.items.children[0].children[1]);
+
+  elements.items.children[0].children[1].onclick();
+  assert.equal(context.cart.length, 0);
+  assert.equal(elements.total.textContent, 'Total: ฿0');
+  assert.equal(elements.preview.disabled, true);
+  assert.equal(elements.name.value, '');
+  assert.equal(focused, elements.items.children[1]);
+
+  context.cart = [robot, service];
+  elements.name.value = 'Guest nickname';
+  render();
+  const clear = new Script('(' + clearSource[1] + ')').runInNewContext(context);
+  clear();
+  assert.equal(context.cart.length, 2, 'Cancel preserves cart');
+  confirmed = true;
+  clear();
+  assert.equal(context.cart.length, 0);
+  assert.equal(elements.count.textContent, 0);
+  assert.equal(elements.preview.disabled, true);
+  assert.equal(elements.name.value, '');
+  assert.match(elements.result.textContent, /Cart cleared\. No order was placed/i);
+});
