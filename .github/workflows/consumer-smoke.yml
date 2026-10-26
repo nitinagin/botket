@@ -1,0 +1,32 @@
+name: Consumer smoke tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - consumer.html
+      - tests/consumer-smoke.test.mjs
+      - .github/workflows/consumer-smoke.yml
+  pull_request:
+    paths:
+      - consumer.html
+      - tests/consumer-smoke.test.mjs
+      - .github/workflows/consumer-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consumer-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run consumer smoke tests
+        run: node --test tests/consumer-smoke.test.mjs
