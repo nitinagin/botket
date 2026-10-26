@@ -549,3 +549,47 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
     assert.equal(destination, expected, 'Incorrect destination for ' + id);
   }
 });
+
+test('service-only journey returns to Services without suggesting a real booking', () => {
+  const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  assert.ok(addSource && previewSource && handoffSource, 'Expected service cart and preview handlers');
+
+  const service = { id: 's2', name: 'Maintenance', price: 1300 };
+  const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
+  const elements = {
+    name: { value: '' },
+    result: { textContent: '' },
+    checkoutToRobots: { hidden: true, textContent: '' }
+  };
+  const visited = [];
+  const context = {
+    cart: [], robots: [robot], services: [service],
+    lastBrowseTab: 'services', b: { dataset: { add: service.id } },
+    byId: id => elements[id],
+    money: amount => '฿' + amount.toLocaleString('en-US'),
+    show: section => visited.push(section)
+  };
+  const addService = new Script('(' + addSource[1] + ')').runInNewContext(context);
+  const previewOrder = new Script('(' + previewSource[1] + ')').runInNewContext(context);
+  const returnToServices = new Script('(' + handoffSource[1] + ')').runInNewContext(context);
+
+  addService();
+  assert.deepEqual(context.cart.map(item => item.id), ['s2']);
+  assert.equal(context.lastBrowseTab, 'services');
+  assert.equal(visited.at(-1), 'cart');
+  assert.match(elements.result.textContent, /No order was placed/i);
+
+  previewOrder();
+  assert.match(elements.result.textContent, /Preview for Guest: 0 robot concept\(s\), 1 service preview\(s\), total ฿1,300/);
+  assert.match(elements.result.textContent, /No payment or order submission occurred/);
+  assert.equal(elements.checkoutToRobots.hidden, false);
+  assert.equal(elements.checkoutToRobots.textContent, 'Return to service previews →');
+
+  returnToServices();
+  assert.equal(visited.at(-1), 'services');
+  addService();
+  assert.equal(context.cart.length, 1, 'Returning to Services must not allow a duplicate');
+  assert.match(elements.result.textContent, /already in your cart/i);
+});
