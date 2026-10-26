@@ -255,3 +255,61 @@ test('demo robot profile registration selects new profiles and protects duplicat
   assert.equal(session.selectedRobotId, 'session-only');
   assert.match(elements.robotMessage.textContent, /will not survive a reload/i);
 });
+
+
+test('clearing all demo profiles requires confirmation and resets skill selection', () => {
+  const source = app.match(/byId\('clearProfiles'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(source, 'Expected the clear demo profiles handler');
+  const elements = {
+    profileSearch: { value: 'search term' },
+    robotMessage: { textContent: '' },
+    robotNickname: { focus() { focused = true; } }
+  };
+  let focused = false, confirmed = false, saves = 0, renders = 0, summaries = 0, prompts = 0;
+  const context = {
+    mine: [{ id: 'demo-1', name: 'Test robot', brand: 'Demo', model: 'A' }],
+    selectedRobotId: 'demo-1',
+    byId: id => elements[id],
+    window: { confirm: () => { prompts++; return confirmed; } },
+    saveRobots: () => { saves++; return true; },
+    renderMyRobots: () => { renders++; },
+    updateSkillsRobotSummary: () => { summaries++; }
+  };
+  const clear = new Script('(' + source[1] + ')').runInNewContext(context);
+
+  clear();
+  assert.equal(context.mine.length, 1, 'Cancel must preserve demo profiles');
+  assert.equal(context.selectedRobotId, 'demo-1');
+  assert.equal(elements.profileSearch.value, 'search term');
+  assert.equal(saves, 0);
+  assert.equal(renders, 0);
+
+  confirmed = true;
+  clear();
+  assert.equal(context.mine.length, 0);
+  assert.equal(context.selectedRobotId, null, 'Clearing removes the skills selection');
+  assert.equal(elements.profileSearch.value, '');
+  assert.equal(saves, 1);
+  assert.equal(renders, 1);
+  assert.equal(summaries, 1);
+  assert.equal(focused, true, 'Keyboard focus returns to the robot nickname field');
+  assert.match(elements.robotMessage.textContent, /No devices were affected/i);
+
+  clear();
+  assert.equal(prompts, 2, 'An empty profile list should not prompt again');
+  assert.equal(saves, 1);
+
+  const storageUnavailable = {
+    mine: [{ id: 'session-1' }], selectedRobotId: 'session-1',
+    byId: id => elements[id],
+    window: { confirm: () => true },
+    saveRobots: () => false,
+    renderMyRobots: () => {},
+    updateSkillsRobotSummary: () => {}
+  };
+  const clearSession = new Script('(' + source[1] + ')').runInNewContext(storageUnavailable);
+  clearSession();
+  assert.equal(storageUnavailable.mine.length, 0);
+  assert.equal(storageUnavailable.selectedRobotId, null);
+  assert.match(elements.robotMessage.textContent, /profiles may reappear after a reload/i);
+});
