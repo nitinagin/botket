@@ -82,6 +82,7 @@ byId('openSkillsFromServices').onclick=()=>show('skills');
 byId('openRobotsFromServices').onclick=()=>show('robots');
 document.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{selectedCategory=b.dataset.category;document.querySelectorAll('[data-category]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render()}));
 byId('profileSearch').addEventListener('input',renderMyRobots);
+byId('profileSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&byId('profileSearch').value){e.preventDefault();byId('profileSearch').value='';renderMyRobots();byId('profileSearch').focus()}});
 byId('clearProfileSearch').onclick=()=>{byId('profileSearch').value='';renderMyRobots();byId('profileSearch').focus()};
 byId('registerRobot').addEventListener('submit',e=>{e.preventDefault();const name=byId('robotNickname').value.trim(),brand=byId('robotBrand').value.trim(),model=byId('robotModel').value.trim();if(!name||!brand||!model){byId('robotMessage').textContent='Complete all three fields.';return}if(addDemoRobot(name,brand,model))e.target.reset()});
 byId('name').addEventListener('input',()=>{if(!byId('checkoutToRobots').hidden){byId('checkoutToRobots').hidden=true;byId('result').textContent='Name changed. Preview again to continue.'}});
