@@ -313,3 +313,64 @@ test('clearing all demo profiles requires confirmation and resets skill selectio
   assert.equal(storageUnavailable.selectedRobotId, null);
   assert.match(elements.robotMessage.textContent, /profiles may reappear after a reload/i);
 });
+
+test('removing one demo profile preserves remaining profiles, selection and keyboard focus', () => {
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the demo robot profile renderer');
+  let focused, confirmed = false, prompts = 0, saves = 0, summaries = 0;
+  const node = () => ({
+    children: [], attributes: {},
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    querySelectorAll(selector) {
+      const key = selector.slice(1, -1);
+      const walk = item => [item, ...(item.children || []).flatMap(walk)];
+      return this.children.flatMap(walk).filter(item => Object.hasOwn(item.attributes || {}, key));
+    },
+    focus() { focused = this; }
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'profileCount', 'clearProfiles', 'profileSearch',
+      'profileSearchSummary', 'robotMessage', 'robotNickname'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const first = { id: 'demo-1', name: 'First robot', brand: 'Example', model: 'A' };
+  const second = { id: 'demo-2', name: 'Second robot', brand: 'Example', model: 'B' };
+  const context = {
+    mine: [first, second], selectedRobotId: first.id,
+    byId: id => elements[id],
+    document: { createElement: node },
+    window: { confirm: () => { prompts++; return confirmed; } },
+    saveRobots: () => { saves++; return true; },
+    updateSkillsRobotSummary: () => { summaries++; },
+    show: () => {}
+  };
+  context.renderMyRobots = new Script('(' + source[0] + ')').runInNewContext(context);
+  context.renderMyRobots();
+  const removeNewest = elements.myrobots.children[0].children.at(-1);
+
+  removeNewest.onclick();
+  assert.deepEqual(context.mine.map(robot => robot.id), ['demo-1', 'demo-2']);
+  assert.equal(context.selectedRobotId, first.id);
+  assert.equal(saves, 0, 'Cancel must not write to browser storage');
+
+  confirmed = true;
+  removeNewest.onclick();
+  assert.deepEqual(context.mine.map(robot => robot.id), ['demo-1']);
+  assert.equal(context.selectedRobotId, first.id, 'Removing another profile preserves selection');
+  assert.equal(saves, 1);
+  assert.equal(summaries, 1);
+  assert.equal(focused, elements.myrobots.querySelectorAll('[data-remove]')[0],
+    'Focus moves to the remaining remove button');
+
+  elements.myrobots.querySelectorAll('[data-remove]')[0].onclick();
+  assert.equal(context.mine.length, 0);
+  assert.equal(context.selectedRobotId, null, 'Removing the selected profile clears skill selection');
+  assert.equal(elements.clearProfiles.hidden, true);
+  assert.equal(focused, elements.robotNickname, 'Focus returns to the add-profile form');
+  assert.equal(saves, 2);
+  assert.equal(summaries, 2);
+  assert.equal(prompts, 3);
+  assert.match(elements.robotMessage.textContent, /removed from this browser/i);
+});
