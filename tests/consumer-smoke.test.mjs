@@ -50,3 +50,41 @@ test('demo cart guards and section handoffs remain present', () => {
     assert.ok(app.includes("byId('" + id + "').onclick"), 'Missing navigation handler: ' + id);
   }
 });
+
+test('demo checkout preview and handoff handle robot, service, mixed and empty carts', () => {
+  const preview = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const handoff = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  assert.ok(preview && handoff, 'Expected both demo checkout handlers');
+
+  const robot = { id: 'r1', price: 34900 };
+  const service = { id: 's1', price: 1500 };
+  const cases = [
+    { label: 'robot-only guest', items: [robot], name: '', expected: 'Preview for Guest: 1 robot concept(s), 0 service preview(s), total ฿34,900', destination: 'robots' },
+    { label: 'service-only named', items: [service], name: 'Alex', expected: 'Preview for Alex: 0 robot concept(s), 1 service preview(s), total ฿1,500', destination: 'services' },
+    { label: 'mixed guest', items: [robot, service], name: '', expected: 'Preview for Guest: 1 robot concept(s), 1 service preview(s), total ฿36,400', destination: 'robots' },
+    { label: 'empty cart', items: [], name: '', expected: 'Add an item to preview a demo order.', destination: null }
+  ];
+
+  for (const scenario of cases) {
+    const elements = {
+      name: { value: scenario.name },
+      result: { textContent: '' },
+      checkoutToRobots: { hidden: true, textContent: '' }
+    };
+    let destination;
+    const context = {
+      cart: scenario.items,
+      robots: [robot],
+      byId: id => elements[id],
+      money: n => '฿' + n.toLocaleString('en-US'),
+      show: tab => { destination = tab; }
+    };
+    new Script('(' + preview[1] + ')').runInNewContext(context)();
+    assert.ok(elements.result.textContent.includes(scenario.expected), scenario.label);
+    assert.equal(elements.checkoutToRobots.hidden, !scenario.items.length, scenario.label);
+    if (scenario.destination) {
+      new Script('(' + handoff[1] + ')').runInNewContext(context)();
+      assert.equal(destination, scenario.destination, scenario.label);
+    }
+  }
+});
