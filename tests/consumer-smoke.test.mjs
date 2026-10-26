@@ -671,7 +671,7 @@ test('mixed robot and service preview routes to My Robots without claiming owner
   assert.equal(context.mine.length, 0, 'Previewing an order must never create or verify ownership');
 });
 
-test('stored demo profiles reject malformed entries and duplicate IDs without changing valid profiles', () => {
+test('stored demo profiles reject malformed entries and duplicate IDs or details without changing valid profiles', () => {
   const validator = app.split('\n').find(line => line.startsWith('function validDemoProfile('));
   const loader = app.split('\n').find(line => line.startsWith("try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)"));
   assert.ok(validator && loader, 'Expected guarded local demo profile storage loader');
@@ -685,6 +685,7 @@ test('stored demo profiles reject malformed entries and duplicate IDs without ch
   const saved = [
     valid,
     { ...valid, name: 'Duplicate ID' },
+    { id: 'demo-duplicate', name: '  HOME   helper ', brand: 'example maker', model: 'a' },
     { id: ' ', name: 'Blank ID', brand: 'Example', model: 'A' },
     { id: 'blank', name: '   ', brand: 'Example', model: 'A' },
     { id: 'oversize', name: 'X'.repeat(41), brand: 'Example', model: 'A' },
@@ -697,6 +698,7 @@ test('stored demo profiles reject malformed entries and duplicate IDs without ch
   assert.equal(loaded.length, 30, 'Only 30 valid unique profiles are loaded');
   assert.equal(loaded[0].name, 'Home helper', 'Valid saved details are preserved');
   assert.equal(new Set(loaded.map(x => x.id)).size, 30);
+  assert.equal(loaded.some(x => x.id === 'demo-duplicate'), false, 'Normalized duplicate details are ignored');
   assert.ok(loaded.every(x => x.name.trim() && x.brand.trim() && x.model.trim()));
   assert.equal(read({ getItem: () => '{broken json' }).length, 0, 'Corrupt JSON is ignored');
   assert.equal(read({ getItem: () => { throw Error('Storage disabled'); } }).length, 0);
