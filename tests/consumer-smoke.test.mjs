@@ -703,3 +703,22 @@ test('stored demo profiles reject malformed entries and duplicate IDs or details
   assert.equal(read({ getItem: () => '{broken json' }).length, 0, 'Corrupt JSON is ignored');
   assert.equal(read({ getItem: () => { throw Error('Storage disabled'); } }).length, 0);
 });
+
+test('generated demo profile IDs use full UUIDs and avoid collisions when randomness is unavailable', () => {
+  const source = app.match(/let demoIdCounter=0;\s*function demoId\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the demo ID generator and collision-safe fallback');
+  const generate = (mine, crypto) => new Script(source[0] + '\nconst first=demoId(); mine.push({id:first}); [first, demoId()]').runInNewContext({
+    mine, crypto, Date: { now: () => 123456 }
+  });
+  const uuid = '12345678-1234-1234-1234-123456789abc';
+  const fullId = 'DEMO-' + uuid.toUpperCase();
+  const normal = generate([], { randomUUID: () => uuid });
+  assert.equal(normal[0], fullId, 'Keep the complete UUID rather than truncating it');
+  assert.notEqual(normal[1], fullId, 'A repeated UUID must not duplicate an existing ID in this session');
+  const storedCollision = generate([{ id: fullId }], { randomUUID: () => uuid });
+  assert.notEqual(storedCollision[0], fullId, 'A stored profile ID collision must use a fallback');
+  assert.equal(new Set(storedCollision).size, 2, 'Fallback IDs must be unique');
+  const fallback = generate([], undefined);
+  assert.equal(new Set(fallback).size, 2, 'Fixed timestamps must not create duplicate IDs');
+  assert.ok(fallback.every(id => id.startsWith('DEMO-')));
+});
