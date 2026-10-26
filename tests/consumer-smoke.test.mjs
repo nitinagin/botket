@@ -722,3 +722,33 @@ test('generated demo profile IDs use full UUIDs and avoid collisions when random
   assert.equal(new Set(fallback).size, 2, 'Fixed timestamps must not create duplicate IDs');
   assert.ok(fallback.every(id => id.startsWith('DEMO-')));
 });
+
+test('stored demo profile loader stops scanning after 30 valid profiles', () => {
+  const validator = app.split('\n').find(line => line.startsWith('function validDemoProfile('));
+  const loader = app.split('\n').find(line => line.startsWith("try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)"));
+  assert.ok(validator && loader, 'Expected guarded demo profile loader');
+  let readPastLimit = false;
+  const saved = [
+    { id: 'invalid', name: '', brand: 'Example', model: 'A' },
+    ...Array.from({ length: 30 }, (_, i) => ({
+      id: 'demo-' + i, name: 'Robot ' + i, brand: 'Example', model: 'A'
+    })),
+    { id: 'extra', name: 'Extra robot', brand: 'Example', model: 'A' }
+  ];
+  Object.defineProperty(saved, 31, {
+    get() {
+      readPastLimit = true;
+      return { id: 'extra', name: 'Extra robot', brand: 'Example', model: 'A' };
+    }
+  });
+  const loaded = new Script(
+    "const STORAGE_KEY='botket-demo-robots-v1'; let mine=[];\n" +
+    validator + '\n' + loader + '\nmine;'
+  ).runInNewContext({
+    localStorage: { getItem: () => '[]' },
+    JSON: { parse: () => saved, stringify: JSON.stringify }
+  });
+  assert.equal(loaded.length, 30, 'Malformed entries do not count toward the 30-profile limit');
+  assert.equal(loaded[0].id, 'demo-0', 'Preserve the first valid profile');
+  assert.equal(readPastLimit, false, 'Stop reading storage entries after reaching the limit');
+});
