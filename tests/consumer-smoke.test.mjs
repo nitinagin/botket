@@ -752,3 +752,65 @@ test('stored demo profile loader stops scanning after 30 valid profiles', () => 
   assert.equal(loaded[0].id, 'demo-0', 'Preserve the first valid profile');
   assert.equal(readPastLimit, false, 'Stop reading storage entries after reaching the limit');
 });
+
+test('My Robots search normalizes whitespace and case without changing saved details', () => {
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the My Robots rendering function');
+
+  const mine = [
+    { id: 'p1', name: 'Home   Helper', brand: 'Example Robotics', model: 'A-1' },
+    { id: 'p2', name: 'Study Bot', brand: 'Sample Maker', model: 'B-2' }
+  ];
+  const root = {
+    children: [],
+    replaceChildren() { this.children = []; },
+    append(...nodes) { this.children.push(...nodes); }
+  };
+  const elements = {
+    myrobots: root,
+    profileCount: { textContent: '' },
+    clearProfiles: { hidden: true },
+    profileSearch: {
+      value: '  hOmE     helper  ', disabled: false,
+      focus() { this.focused = true; }
+    },
+    profileSearchSummary: { textContent: '' }
+  };
+  const createElement = tag => ({
+    tagName: tag, children: [], textContent: '',
+    setAttribute() {},
+    append(...nodes) { this.children.push(...nodes); },
+    focus() {}
+  });
+  const context = {
+    mine, selectedRobotId: null,
+    byId: id => elements[id],
+    document: { createElement },
+    window: { confirm: () => true },
+    saveRobots: () => true,
+    show: () => {},
+    updateSkillsRobotSummary: () => {}
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+
+  render();
+  assert.match(elements.profileSearchSummary.textContent, /Showing 1 of 2 matching/);
+  assert.equal(root.children.length, 1);
+  assert.equal(root.children[0].children[0].textContent, 'Home   Helper');
+  assert.equal(mine[0].name, 'Home   Helper', 'Searching must not mutate saved profiles');
+
+  elements.profileSearch.value = '  sAMpLE    mAkEr ';
+  render();
+  assert.equal(root.children.length, 1);
+  assert.equal(root.children[0].children[0].textContent, 'Study Bot');
+
+  elements.profileSearch.value = 'not present';
+  render();
+  assert.match(elements.profileSearchSummary.textContent, /Showing 0 of 2 matching/);
+  assert.equal(root.children.length, 2, 'No matches shows a message and clear-search button');
+  root.children[1].onclick();
+  assert.equal(elements.profileSearch.value, '');
+  assert.equal(elements.profileSearch.focused, true, 'Clearing search restores keyboard focus');
+  assert.equal(root.children.length, 2);
+  assert.match(elements.profileSearchSummary.textContent, /Showing all 2 demo profile/);
+});
