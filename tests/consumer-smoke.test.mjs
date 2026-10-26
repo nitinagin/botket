@@ -869,3 +869,86 @@ test('Escape clears My Robots search while leaving other keys alone', () => {
   handler({ key: 'Escape', preventDefault() { prevented++; } });
   assert.equal(renders, 1, 'Empty queries do not trigger redundant rerenders');
 });
+
+test('robot concept to checkout to local profile to skills to services stays demo-only', () => {
+  const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const checkoutSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  const registerSource = app.match(/function addDemoRobot\(name,brand,model\)\{[^\n]*\}/);
+  const skillsSource = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/);
+  const servicesSource = app.split("byId('openServicesFromSkills').onclick=")[1]?.split(';')[0];
+  assert.ok(addSource && previewSource && checkoutSource && registerSource && skillsSource && servicesSource,
+    'Expected the existing demo funnel handlers');
+
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const service = { id: 's2', name: 'Maintenance', price: 1300 };
+  const picker = {
+    children: [], value: '', disabled: false,
+    replaceChildren(...nodes) { this.children = nodes; },
+    append(...nodes) { this.children.push(...nodes); },
+    focus() {}
+  };
+  const elements = {
+    name: { value: '' },
+    result: { textContent: '' },
+    checkoutToRobots: { hidden: true, textContent: '' },
+    profileSearch: { value: '' },
+    robotMessage: { textContent: '' },
+    skillRobotSelect: picker,
+    skillsRobotSummary: { textContent: '' }
+  };
+  const visited = [];
+  let saves = 0;
+  const context = {
+    cart: [], mine: [], robots: [robot], services: [service],
+    selectedRobotId: null, lastBrowseTab: 'store',
+    b: { dataset: { add: robot.id } },
+    byId: id => elements[id],
+    money: amount => '฿' + amount.toLocaleString('en-US'),
+    demoId: () => 'DEMO-local-1',
+    saveRobots: () => { saves++; return true; },
+    show: section => visited.push(section),
+    document: {
+      activeElement: null,
+      createElement: () => ({ value: '', textContent: '' })
+    }
+  };
+  const run = source => new Script('(' + source + ')').runInNewContext(context);
+  const add = run(addSource[1]);
+  const preview = run(previewSource[1]);
+  const checkout = run(checkoutSource[1]);
+  const register = run(registerSource[0]);
+  const updateSkills = run(skillsSource[0]);
+  const openServices = run(servicesSource);
+
+  add();
+  assert.equal(visited.at(-1), 'cart', 'Discover sends a robot concept to demo checkout');
+  preview();
+  assert.match(elements.result.textContent, /Preview for Guest: 1 robot concept\(s\), 0 service preview\(s\), total ฿34,900/);
+  assert.match(elements.result.textContent, /No payment or order submission occurred/);
+  checkout();
+  assert.equal(visited.at(-1), 'robots');
+  assert.equal(context.mine.length, 0, 'Checkout never grants ownership or creates a profile');
+
+  assert.equal(register('Home helper', 'Example Maker', 'Model A'), true);
+  assert.equal(context.mine.length, 1, 'Registration is an explicit separate action');
+  assert.equal(saves, 1);
+  assert.equal(context.selectedRobotId, 'DEMO-local-1');
+  assert.match(elements.robotMessage.textContent, /Compatibility not verified; no device connected/);
+  updateSkills();
+  assert.equal(picker.value, 'DEMO-local-1');
+  assert.match(elements.skillsRobotSummary.textContent, /Compatibility has not been checked/);
+  assert.match(elements.skillsRobotSummary.textContent, /installation is unavailable/);
+
+  openServices();
+  assert.equal(visited.at(-1), 'services');
+  context.b.dataset.add = service.id;
+  add();
+  assert.equal(visited.at(-1), 'cart');
+  preview();
+  assert.match(elements.result.textContent, /1 robot concept\(s\), 1 service preview\(s\), total ฿36,200/);
+  assert.match(elements.result.textContent, /No payment or order submission occurred/);
+  assert.equal(context.mine.length, 1, 'Adding a service does not create another robot profile');
+  assert.equal(saves, 1, 'Checkout and service previews never write robot profiles');
+  assert.match(page, /No bookings, service requests or payments are available/);
+});
