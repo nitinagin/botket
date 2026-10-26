@@ -593,3 +593,37 @@ test('service-only journey returns to Services without suggesting a real booking
   assert.equal(context.cart.length, 1, 'Returning to Services must not allow a duplicate');
   assert.match(elements.result.textContent, /already in your cart/i);
 });
+
+test('editing checkout nickname invalidates stale preview before handoff', () => {
+  const previewSource = app.match(/byId\\('preview'\\)\\.onclick=(\\(\\)=>\\{[^\\n]*\\});/);
+  const nameSource = app.match(/byId\\('name'\\)\\.addEventListener\\('input',(\\(\\)=>\\{[^\\n]*\\})\\);/);
+  assert.ok(previewSource && nameSource, 'Expected preview and nickname input handlers');
+
+  const robot = { id: 'r1', price: 34900 };
+  const elements = {
+    name: { value: '' },
+    result: { textContent: '' },
+    checkoutToRobots: { hidden: true, textContent: '' }
+  };
+  const context = {
+    cart: [robot], robots: [robot],
+    byId: id => elements[id],
+    money: amount => '฿' + amount.toLocaleString('en-US')
+  };
+  const preview = new Script('(' + previewSource[1] + ')').runInNewContext(context);
+  const onNameInput = new Script('(' + nameSource[1] + ')').runInNewContext(context);
+
+  preview();
+  assert.equal(elements.checkoutToRobots.hidden, false);
+  assert.match(elements.result.textContent, /Preview for Guest:/);
+
+  elements.name.value = 'Alex';
+  onNameInput();
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Changed nickname must block stale handoff');
+  assert.match(elements.result.textContent, /Name changed\\. Preview again to continue/);
+
+  preview();
+  assert.equal(elements.checkoutToRobots.hidden, false, 'Fresh preview restores handoff');
+  assert.match(elements.result.textContent, /Preview for Alex:/);
+  assert.match(elements.result.textContent, /No payment or order submission occurred/);
+});
