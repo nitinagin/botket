@@ -423,3 +423,59 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.match(summary.textContent, /No demo robot profiles saved/);
   assert.match(summary.textContent, /does not verify compatibility/);
 });
+
+test('discover filters and concept-to-profile handoff preserve demo-only behavior', () => {
+  const filterSource = app.match(/document\.querySelectorAll\('\[data-category\]'\)\.forEach\(b=>b\.addEventListener\('click',(\(\)=>\{[^\n]*\})\)\);/);
+  const profileSource = app.match(/document\.querySelectorAll\('\[data-robot\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  assert.ok(filterSource && profileSource, 'Expected Discover filter and concept profile handlers');
+
+  const buttons = ['all', 'home', 'education'].map(category => ({
+    dataset: { category }, pressed: '',
+    setAttribute(name, value) {
+      if (name === 'aria-pressed') this.pressed = value;
+    }
+  }));
+  let renders = 0;
+  const filterContext = {
+    selectedCategory: 'all', b: buttons[2],
+    document: { querySelectorAll: () => buttons },
+    render: () => { renders++; }
+  };
+  const filter = new Script('(' + filterSource[1] + ')').runInNewContext(filterContext);
+  filter();
+  assert.equal(filterContext.selectedCategory, 'education');
+  assert.deepEqual(buttons.map(button => button.pressed), ['false', 'false', 'true']);
+  assert.equal(renders, 1, 'Changing a category rerenders Discover');
+
+  filterContext.b = buttons[0];
+  filter();
+  assert.equal(filterContext.selectedCategory, 'all');
+  assert.deepEqual(buttons.map(button => button.pressed), ['true', 'false', 'false']);
+  assert.equal(renders, 2);
+
+  let focused = false, destination;
+  const fields = {
+    robotNickname: { value: '' },
+    robotBrand: { value: 'Old brand', focus() { focused = true; } },
+    robotModel: { value: 'Old model' },
+    robotMessage: { textContent: '' }
+  };
+  const profileContext = {
+    robots: [{ id: 'r2', name: 'Companion Robot Concept' }],
+    b: { dataset: { robot: 'r2' } },
+    byId: id => fields[id],
+    show: tab => { destination = tab; }
+  };
+  const prefill = new Script('(' + profileSource[1] + ')').runInNewContext(profileContext);
+  prefill();
+  assert.equal(fields.robotNickname.value, 'Companion Robot Concept');
+  assert.equal(fields.robotBrand.value, '', 'Never infer a real manufacturer from a concept');
+  assert.equal(fields.robotModel.value, '', 'Never infer a compatible device model');
+  assert.equal(destination, 'robots');
+  assert.equal(focused, true, 'Focus should move to the brand field');
+  assert.match(fields.robotMessage.textContent, /Ownership and compatibility are not verified/i);
+
+  profileContext.b.dataset.robot = 'unknown';
+  prefill();
+  assert.equal(fields.robotNickname.value, 'Companion Robot Concept', 'Unknown concepts must not overwrite the form');
+});
