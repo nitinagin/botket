@@ -627,3 +627,46 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
   assert.match(elements.result.textContent, /Preview for Alex:/);
   assert.match(elements.result.textContent, /No payment or order submission occurred/);
 });
+
+test('mixed robot and service preview routes to My Robots without claiming ownership', () => {
+  const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  assert.ok(addSource && previewSource && handoffSource, 'Expected mixed cart and preview handlers');
+
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const service = { id: 's2', name: 'Maintenance', price: 1300 };
+  const elements = {
+    name: { value: '' },
+    result: { textContent: '' },
+    checkoutToRobots: { hidden: true, textContent: '' }
+  };
+  const visited = [];
+  const context = {
+    cart: [], mine: [], robots: [robot], services: [service],
+    b: { dataset: { add: robot.id } }, lastBrowseTab: 'store',
+    byId: id => elements[id],
+    money: amount => '฿' + amount.toLocaleString('en-US'),
+    show: tab => visited.push(tab)
+  };
+  const addItem = new Script('(' + addSource[1] + ')').runInNewContext(context);
+  const previewOrder = new Script('(' + previewSource[1] + ')').runInNewContext(context);
+  const continueFromCheckout = new Script('(' + handoffSource[1] + ')').runInNewContext(context);
+
+  addItem();
+  context.b.dataset.add = service.id;
+  addItem();
+  assert.deepEqual(context.cart.map(item => item.id), ['r1', 's2']);
+  assert.equal(context.lastBrowseTab, 'services');
+  assert.equal(visited.at(-1), 'cart');
+
+  previewOrder();
+  assert.match(elements.result.textContent, /1 robot concept\(s\), 1 service preview\(s\), total ฿36,200/);
+  assert.match(elements.result.textContent, /No payment or order submission occurred/);
+  assert.equal(elements.checkoutToRobots.hidden, false);
+  assert.equal(elements.checkoutToRobots.textContent, 'Continue to My Robots (demo) →');
+
+  continueFromCheckout();
+  assert.equal(visited.at(-1), 'robots', 'Mixed carts should lead to optional local profiles');
+  assert.equal(context.mine.length, 0, 'Previewing an order must never create or verify ownership');
+});
