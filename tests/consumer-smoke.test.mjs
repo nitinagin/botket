@@ -374,3 +374,52 @@ test('removing one demo profile preserves remaining profiles, selection and keyb
   assert.equal(prompts, 3);
   assert.match(elements.robotMessage.textContent, /removed from this browser/i);
 });
+
+test('skills picker reflects selected demo profiles and keeps compatibility warnings visible', () => {
+  const source = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the demo skills selector renderer');
+
+  let focusCalls = 0;
+  const picker = {
+    children: [], value: '', disabled: false,
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    focus() { focusCalls++; }
+  };
+  const summary = { textContent: '' };
+  const first = { id: 'demo-1', name: 'Home helper', brand: 'Example', model: 'A' };
+  const second = { id: 'demo-2', name: 'Study helper', brand: 'Example', model: 'B' };
+  const context = {
+    mine: [first, second], selectedRobotId: second.id,
+    byId: id => id === 'skillRobotSelect' ? picker : summary,
+    document: {
+      activeElement: picker,
+      createElement: () => ({ value: '', textContent: '' })
+    }
+  };
+  const update = new Script('(' + source[0] + ')').runInNewContext(context);
+
+  update();
+  assert.deepEqual(picker.children.map(option => option.value), ['', first.id, second.id]);
+  assert.equal(picker.value, second.id);
+  assert.equal(picker.disabled, false);
+  assert.equal(focusCalls, 1, 'Rebuilding the selector must preserve keyboard focus');
+  assert.match(summary.textContent, /Viewing generic skill previews from Study helper/);
+  assert.match(summary.textContent, /Compatibility has not been checked/);
+  assert.match(summary.textContent, /installation is unavailable/i);
+
+  context.selectedRobotId = 'deleted-profile';
+  context.document.activeElement = null;
+  update();
+  assert.equal(context.selectedRobotId, null, 'Deleted profiles must not remain selected');
+  assert.equal(picker.value, '');
+  assert.match(summary.textContent, /2 local demo robot profile\(s\) saved/);
+  assert.equal(focusCalls, 1, 'Do not steal focus from another control');
+
+  context.mine = [];
+  update();
+  assert.equal(picker.disabled, true, 'No profiles means no selectable robot');
+  assert.deepEqual(picker.children.map(option => option.value), ['']);
+  assert.match(summary.textContent, /No demo robot profiles saved/);
+  assert.match(summary.textContent, /does not verify compatibility/);
+});
