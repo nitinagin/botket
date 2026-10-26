@@ -969,6 +969,7 @@ test('Discover concept search combines category filters, normalized terms and ac
   const elements = {
     robotSearch: { value: '  HOME    ROBOT ', focused: false, focus() { this.focused = true; } },
     clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true },
     filterSummary: { textContent: '' },
     products: { innerHTML: '' },
     skillcards: { innerHTML: '' },
@@ -1016,4 +1017,48 @@ test('Discover concept search combines category filters, normalized terms and ac
   assert.equal(prevented, 1);
   assert.match(elements.filterSummary.textContent, /Showing 3 of 3 robot concepts/);
   assert.equal(catalog.length, 3, 'Filtering never modifies the concept catalog');
+});
+
+test('Discover no-results recovery clears both filters and restores all demo concepts', () => {
+  assert.match(page, /id="resetDiscoverFilters" hidden>Show all robot concepts/);
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
+  const resetSource = app.match(/byId\('resetDiscoverFilters'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(source && resetSource, 'Discover recovery and renderer must exist');
+  const catalog = [
+    { id: 'r1', name: 'Home Robot Concept', category: 'home' },
+    { id: 'r2', name: 'Companion Robot Concept', category: 'companion' }
+  ];
+  const categoryButtons = ['all', 'home', 'companion', 'education'].map(category => ({
+    dataset: { category }, pressed: null,
+    setAttribute(name, value) { if (name === 'aria-pressed') this.pressed = value; }
+  }));
+  const elements = {
+    robotSearch: { value: 'home', focused: false, focus() { this.focused = true; } },
+    clearRobotSearch: { hidden: true }, resetDiscoverFilters: { hidden: true },
+    filterSummary: { textContent: '' }, products: { innerHTML: '' },
+    skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: catalog, skills: [], services: [], selectedCategory: 'companion',
+    byId: id => elements[id], card: x => '<article>' + x.name + '</article>',
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, renderCart: () => {},
+    document: { querySelectorAll: selector => selector === '[data-category]' ? categoryButtons : [] }
+  };
+  const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
+  context.render = render;
+  const reset = new Script('(' + resetSource[1] + ')').runInNewContext(context);
+  render();
+  assert.equal(elements.resetDiscoverFilters.hidden, false, 'No matches shows recovery');
+  assert.match(elements.products.innerHTML, /No robot concepts match/);
+  reset();
+  assert.equal(context.selectedCategory, 'all');
+  assert.equal(elements.robotSearch.value, '');
+  assert.equal(elements.robotSearch.focused, true, 'Focus returns to search');
+  assert.equal(elements.resetDiscoverFilters.hidden, true, 'Recovery hides once results return');
+  assert.equal(categoryButtons[0].pressed, 'true');
+  assert.ok(categoryButtons.slice(1).every(button => button.pressed === 'false'));
+  assert.match(elements.filterSummary.textContent, /Showing 2 of 2 robot concepts/);
+  assert.match(elements.products.innerHTML, /Home Robot Concept/);
+  assert.match(elements.products.innerHTML, /Companion Robot Concept/);
+  assert.equal(catalog.length, 2, 'Recovery must not modify catalog');
 });
