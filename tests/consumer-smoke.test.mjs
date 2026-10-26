@@ -670,3 +670,34 @@ test('mixed robot and service preview routes to My Robots without claiming owner
   assert.equal(visited.at(-1), 'robots', 'Mixed carts should lead to optional local profiles');
   assert.equal(context.mine.length, 0, 'Previewing an order must never create or verify ownership');
 });
+
+test('stored demo profiles reject malformed entries and duplicate IDs without changing valid profiles', () => {
+  const validator = app.split('\n').find(line => line.startsWith('function validDemoProfile('));
+  const loader = app.split('\n').find(line => line.startsWith("try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)"));
+  assert.ok(validator && loader, 'Expected guarded local demo profile storage loader');
+
+  const read = storage => new Script(
+    "const STORAGE_KEY='botket-demo-robots-v1'; let mine=[];\n" +
+    validator + '\n' + loader + '\nmine;'
+  ).runInNewContext({ localStorage: storage });
+
+  const valid = { id: 'demo-1', name: 'Home helper', brand: 'Example Maker', model: 'A' };
+  const saved = [
+    valid,
+    { ...valid, name: 'Duplicate ID' },
+    { id: ' ', name: 'Blank ID', brand: 'Example', model: 'A' },
+    { id: 'blank', name: '   ', brand: 'Example', model: 'A' },
+    { id: 'oversize', name: 'X'.repeat(41), brand: 'Example', model: 'A' },
+    { id: 'wrong-type', name: 'Robot', brand: 123, model: 'A' },
+    ...Array.from({ length: 35 }, (_, i) => ({
+      id: 'demo-' + (i + 2), name: 'Robot ' + i, brand: 'Example', model: 'B'
+    }))
+  ];
+  const loaded = read({ getItem: () => JSON.stringify(saved) });
+  assert.equal(loaded.length, 30, 'Only 30 valid unique profiles are loaded');
+  assert.equal(loaded[0].name, 'Home helper', 'Valid saved details are preserved');
+  assert.equal(new Set(loaded.map(x => x.id)).size, 30);
+  assert.ok(loaded.every(x => x.name.trim() && x.brand.trim() && x.model.trim()));
+  assert.equal(read({ getItem: () => '{broken json' }).length, 0, 'Corrupt JSON is ignored');
+  assert.equal(read({ getItem: () => { throw Error('Storage disabled'); } }).length, 0);
+});
