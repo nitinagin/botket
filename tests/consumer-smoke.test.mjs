@@ -595,8 +595,8 @@ test('service-only journey returns to Services without suggesting a real booking
 });
 
 test('editing checkout nickname invalidates stale preview before handoff', () => {
-  const previewSource = app.match(/byId\\('preview'\\)\\.onclick=(\\(\\)=>\\{[^\\n]*\\});/);
-  const nameSource = app.match(/byId\\('name'\\)\\.addEventListener\\('input',(\\(\\)=>\\{[^\\n]*\\})\\);/);
+  const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  const nameSource = app.match(/byId\('name'\)\.addEventListener\('input',(\(\)=>\{[^\n]*\})\);/);
   assert.ok(previewSource && nameSource, 'Expected preview and nickname input handlers');
 
   const robot = { id: 'r1', price: 34900 };
@@ -620,7 +620,7 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
   elements.name.value = 'Alex';
   onNameInput();
   assert.equal(elements.checkoutToRobots.hidden, true, 'Changed nickname must block stale handoff');
-  assert.match(elements.result.textContent, /Name changed\\. Preview again to continue/);
+  assert.match(elements.result.textContent, /Name changed\. Preview again to continue/);
 
   preview();
   assert.equal(elements.checkoutToRobots.hidden, false, 'Fresh preview restores handoff');
