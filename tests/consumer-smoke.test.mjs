@@ -804,6 +804,21 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].children[0].textContent, 'Study Bot');
 
+  elements.profileSearch.value = '  EXAMPLE    a-1 ';
+  render();
+  assert.equal(root.children.length, 1, 'Terms should match across brand and model');
+  assert.equal(root.children[0].children[0].textContent, 'Home   Helper');
+
+  elements.profileSearch.value = 'maker study';
+  render();
+  assert.equal(root.children.length, 1, 'Search terms may appear in any order');
+  assert.equal(root.children[0].children[0].textContent, 'Study Bot');
+
+  elements.profileSearch.value = 'study missing';
+  render();
+  assert.match(elements.profileSearchSummary.textContent, /Showing 0 of 2 matching/,
+    'Every search term must match');
+
   elements.profileSearch.value = 'not present';
   render();
   assert.match(elements.profileSearchSummary.textContent, /Showing 0 of 2 matching/);
