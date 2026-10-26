@@ -88,3 +88,50 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
     }
   }
 });
+
+test('demo cart add handler rejects duplicates, unknown items and the 20-item limit', () => {
+  const match = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  assert.ok(match, 'Expected the demo cart add handler');
+
+  const robot = { id: 'r1', price: 34900 };
+  const anotherRobot = { id: 'r2', price: 24900 };
+  const service = { id: 's1', price: 1500 };
+  const cart = [];
+  const button = { dataset: { add: robot.id } };
+  const result = { textContent: '' };
+  const destinations = [];
+  const context = {
+    cart,
+    robots: [robot, anotherRobot],
+    services: [service],
+    b: button,
+    lastBrowseTab: 'store',
+    show: tab => destinations.push(tab),
+    byId: id => id === 'result' ? result : undefined
+  };
+  const addItem = new Script('(' + match[1] + ')').runInNewContext(context);
+
+  addItem();
+  assert.equal(cart.length, 1, 'First robot concept should be added');
+  assert.equal(cart[0].id, robot.id);
+  assert.equal(destinations.at(-1), 'cart');
+
+  addItem();
+  assert.equal(cart.length, 1, 'Repeated click must not duplicate the item');
+  assert.match(result.textContent, /already in your cart/i);
+
+  button.dataset.add = service.id;
+  addItem();
+  assert.equal(cart.length, 2, 'A different service preview can be added');
+  assert.equal(cart[1].id, service.id);
+
+  button.dataset.add = 'unknown';
+  addItem();
+  assert.equal(cart.length, 2, 'Unknown catalog IDs must be ignored');
+
+  cart.push(...Array.from({ length: 18 }, (_, i) => ({ id: 'placeholder-' + i })));
+  button.dataset.add = anotherRobot.id;
+  addItem();
+  assert.equal(cart.length, 20, 'Cart must not exceed the demo limit');
+  assert.match(result.textContent, /limit reached/i);
+});
