@@ -850,7 +850,7 @@ test('My Robots clear-search control resets matching results and preserves input
 });
 
 test('Escape clears My Robots search while leaving other keys alone', () => {
-  const source = app.match(/byId\\('profileSearch'\\)\\.addEventListener\\('keydown',(e=>\\{[^\\n]*\\})\\);/);
+  const source = app.match(/byId\('profileSearch'\)\.addEventListener\('keydown',(e=>\{[^\n]*\})\);/);
   assert.ok(source, 'Expected the Escape keyboard shortcut handler');
   const search = { value: 'maker study', focused: false, focus() { this.focused = true; } };
   let renders = 0, prevented = 0;
