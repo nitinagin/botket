@@ -848,3 +848,24 @@ test('My Robots clear-search control resets matching results and preserves input
   assert.equal(rerenders, 1);
   assert.equal(search.focusCalled, true);
 });
+
+test('Escape clears My Robots search while leaving other keys alone', () => {
+  const source = app.match(/byId\\('profileSearch'\\)\\.addEventListener\\('keydown',(e=>\\{[^\\n]*\\})\\);/);
+  assert.ok(source, 'Expected the Escape keyboard shortcut handler');
+  const search = { value: 'maker study', focused: false, focus() { this.focused = true; } };
+  let renders = 0, prevented = 0;
+  const handler = new Script('(' + source[1] + ')').runInNewContext({
+    byId: id => id === 'profileSearch' ? search : undefined,
+    renderMyRobots: () => { renders++; }
+  });
+  handler({ key: 'Enter', preventDefault() { prevented++; } });
+  assert.equal(search.value, 'maker study', 'Other keys must preserve the query');
+  assert.equal(renders, 0);
+  handler({ key: 'Escape', preventDefault() { prevented++; } });
+  assert.equal(search.value, '');
+  assert.equal(renders, 1, 'Clearing must refresh visible results');
+  assert.equal(prevented, 1, 'Prevent the browser from also handling Escape');
+  assert.equal(search.focused, true, 'Search focus remains available for another query');
+  handler({ key: 'Escape', preventDefault() { prevented++; } });
+  assert.equal(renders, 1, 'Empty queries do not trigger redundant rerenders');
+});
