@@ -479,3 +479,73 @@ test('discover filters and concept-to-profile handoff preserve demo-only behavio
   prefill();
   assert.equal(fields.robotNickname.value, 'Companion Robot Concept', 'Unknown concepts must not overwrite the form');
 });
+
+test('section navigation and Skills ↔ Services handoffs keep demo routes accessible', () => {
+  const source = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected the shared section navigation function');
+
+  const ids = ['store', 'cart', 'robots', 'skills', 'services'];
+  const focusCounts = Object.fromEntries(ids.map(id => [id, 0]));
+  const sections = Object.fromEntries(ids.map(id => [id, {
+    hidden: false,
+    querySelector: selector => selector === 'h2' ? {
+      focus() { focusCounts[id]++; }
+    } : null
+  }]));
+  const tabs = ids.map(id => {
+    const tab = {
+      dataset: { tab: id }, active: false, current: null,
+      setAttribute(key, value) { if (key === 'aria-current') this.current = value; },
+      removeAttribute(key) { if (key === 'aria-current') this.current = null; }
+    };
+    tab.classList = { toggle(key, enabled) { if (key === 'active') tab.active = enabled; } };
+    return tab;
+  });
+  let renders = 0;
+  const context = {
+    lastBrowseTab: 'store',
+    document: {
+      activeElement: { closest: () => ({ id: 'robots' }) },
+      querySelectorAll: selector => selector === '[data-tab]' ? tabs : []
+    },
+    byId: id => sections[id],
+    render: () => { renders++; }
+  };
+  const show = new Script('(' + source[0] + ')').runInNewContext(context);
+  const checkVisible = expected => {
+    assert.deepEqual(ids.filter(id => !sections[id].hidden), [expected]);
+    assert.deepEqual(tabs.filter(tab => tab.active).map(tab => tab.dataset.tab), [expected]);
+    assert.deepEqual(tabs.filter(tab => tab.current === 'page').map(tab => tab.dataset.tab), [expected]);
+  };
+
+  show('skills');
+  checkVisible('skills');
+  assert.equal(focusCounts.skills, 1, 'Cross-section navigation focuses the destination heading');
+  show('services');
+  checkVisible('services');
+  assert.equal(context.lastBrowseTab, 'services', 'Services becomes the checkout browse destination');
+  show('cart');
+  checkVisible('cart');
+  assert.equal(context.lastBrowseTab, 'services', 'Checkout must retain the last browsed catalog');
+  show('store', true);
+  checkVisible('store');
+  assert.equal(context.lastBrowseTab, 'store');
+  assert.equal(focusCounts.store, 1, 'Explicit tab navigation focuses the heading');
+  assert.equal(renders, 4, 'Each navigation rerenders the active demo state');
+
+  for (const [id, expected] of [
+    ['openSkillsFromRobots', 'skills'],
+    ['openRobotsFromSkills', 'robots'],
+    ['openServicesFromSkills', 'services'],
+    ['openSkillsFromServices', 'skills'],
+    ['openRobotsFromServices', 'robots']
+  ]) {
+    const handler = app.split("byId('" + id + "').onclick=")[1]?.split(';')[0];
+    assert.ok(handler, 'Missing demo handoff: ' + id);
+    let destination;
+    new Script('(' + handler + ')').runInNewContext({
+      show: tab => { destination = tab; }
+    })();
+    assert.equal(destination, expected, 'Incorrect destination for ' + id);
+  }
+});
