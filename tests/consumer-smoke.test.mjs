@@ -332,7 +332,7 @@ test('removing one demo profile preserves remaining profiles, selection and keyb
   });
   const elements = Object.fromEntries(
     ['myrobots', 'profileCount', 'clearProfiles', 'profileSearch',
-      'profileSearchSummary', 'robotMessage', 'robotNickname'].map(id => [id, node()])
+      'profileSearchSummary', 'clearProfileSearch', 'robotMessage', 'robotNickname'].map(id => [id, node()])
   );
   elements.profileSearch.value = '';
   const first = { id: 'demo-1', name: 'First robot', brand: 'Example', model: 'A' };
@@ -774,7 +774,8 @@ test('My Robots search normalizes whitespace and case without changing saved det
       value: '  hOmE     helper  ', disabled: false,
       focus() { this.focused = true; }
     },
-    profileSearchSummary: { textContent: '' }
+    profileSearchSummary: { textContent: '' },
+    clearProfileSearch: { hidden: true }
   };
   const createElement = tag => ({
     tagName: tag, children: [], textContent: '',
@@ -795,6 +796,7 @@ test('My Robots search normalizes whitespace and case without changing saved det
 
   render();
   assert.match(elements.profileSearchSummary.textContent, /Showing 1 of 2 matching/);
+  assert.equal(elements.clearProfileSearch.hidden, false, 'Clear search is available with matching results');
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].children[0].textContent, 'Home   Helper');
   assert.equal(mine[0].name, 'Home   Helper', 'Searching must not mutate saved profiles');
@@ -828,4 +830,21 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.equal(elements.profileSearch.focused, true, 'Clearing search restores keyboard focus');
   assert.equal(root.children.length, 2);
   assert.match(elements.profileSearchSummary.textContent, /Showing all 2 demo profile/);
+  assert.equal(elements.clearProfileSearch.hidden, true, 'Clear search hides when query is empty');
+});
+
+test('My Robots clear-search control resets matching results and preserves input focus', () => {
+  assert.match(page, /id="clearProfileSearch" hidden aria-label="Clear demo profile search"/);
+  const source = app.match(/byId\('clearProfileSearch'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(source, 'Expected the clear-search button handler');
+  const search = { value: 'study robot', focusCalled: false, focus() { this.focusCalled = true; } };
+  let rerenders = 0;
+  const handler = new Script('(' + source[1] + ')').runInNewContext({
+    byId: id => id === 'profileSearch' ? search : undefined,
+    renderMyRobots: () => { rerenders++; }
+  });
+  handler();
+  assert.equal(search.value, '');
+  assert.equal(rerenders, 1);
+  assert.equal(search.focusCalled, true);
 });
