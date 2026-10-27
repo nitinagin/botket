@@ -169,7 +169,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
-      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart'].map(id => [id, node()])
+      'preview', 'checkoutToRobots', 'name', 'clearPreviewName', 'result', 'reviewServicesCart', 'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart'].map(id => [id, node()])
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
@@ -644,6 +644,7 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
   const robot = { id: 'r1', price: 34900 };
   const elements = {
     name: { value: '' },
+    clearPreviewName: { hidden: true },
     result: { textContent: '' },
     checkoutToRobots: { hidden: true, textContent: '' }
   };
@@ -661,6 +662,7 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
 
   elements.name.value = 'Alex';
   onNameInput();
+  assert.equal(elements.clearPreviewName.hidden, false, 'Typed nickname exposes privacy clear control');
   assert.equal(elements.checkoutToRobots.hidden, true, 'Changed nickname must block stale handoff');
   assert.match(elements.result.textContent, /Name changed\. Preview again to continue/);
 
@@ -668,6 +670,26 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
   assert.equal(elements.checkoutToRobots.hidden, false, 'Fresh preview restores handoff');
   assert.match(elements.result.textContent, /Preview for Alex:/);
   assert.match(elements.result.textContent, /No payment or order submission occurred/);
+});
+
+test('checkout nickname can be cleared without submitting an order or leaving stale preview', () => {
+  assert.match(page, /id="clearPreviewName" hidden aria-label="Clear checkout preview nickname"/);
+  const source = app.match(/byId\('clearPreviewName'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(source, 'Expected checkout nickname clear handler');
+  let focused = false;
+  const elements = {
+    name: { value: 'Alex', focus() { focused = true; } },
+    clearPreviewName: { hidden: false },
+    checkoutToRobots: { hidden: false },
+    result: { textContent: 'Preview for Alex' }
+  };
+  const clear = new Script('(' + source[1] + ')').runInNewContext({ byId: id => elements[id] });
+  clear();
+  assert.equal(elements.name.value, '');
+  assert.equal(elements.clearPreviewName.hidden, true);
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Clearing nickname invalidates preview handoff');
+  assert.match(elements.result.textContent, /Name cleared\. Preview again to continue/);
+  assert.equal(focused, true, 'Focus returns to nickname field');
 });
 
 test('mixed robot and service preview routes to My Robots without claiming ownership', () => {
