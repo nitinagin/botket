@@ -498,7 +498,7 @@ test('discover filters and concept-to-profile handoff preserve demo-only behavio
     robotMessage: { textContent: '' }
   };
   const profileContext = {
-    robots: [{ id: 'r2', name: 'Companion Robot Concept' }],
+    robots: [{ id: 'r2', name: 'Companion Robot Concept' }], mine: [],
     b: { dataset: { robot: 'r2' } },
     byId: id => fields[id],
     show: tab => { destination = tab; }
@@ -1650,4 +1650,41 @@ test('My Robots disables profile submission at 30 saved demos and re-enables it 
   assert.equal(button.disabled, false, 'Removing one profile must restore the save action');
   assert.equal(button.textContent, 'Save demo profile');
   assert.doesNotThrow(() => update(0, false), 'Minimal test DOMs without this button remain supported');
+});
+
+
+test('Discover concept handoff protects unsaved profile fields when 30 demo profiles are saved', () => {
+  const source = app.match(/document\.querySelectorAll\('\[data-robot\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
+  assert.ok(source, 'Expected Discover concept profile action');
+  let destination = null, focused = null;
+  const fields = {
+    robotNickname: { value: 'Unsaved nickname' },
+    robotBrand: { value: 'Unsaved brand', focus() { focused = 'brand'; } },
+    robotModel: { value: 'Unsaved model' },
+    robotMessage: { textContent: '' },
+    clearProfiles: { focus() { focused = 'manage'; } }
+  };
+  const context = {
+    robots: [{ id: 'r1', name: 'Home Robot Concept' }],
+    mine: Array.from({ length: 30 }, (_, i) => ({ id: 'demo-' + i })),
+    b: { dataset: { robot: 'r1' } },
+    byId: id => fields[id],
+    show: tab => { destination = tab; }
+  };
+  const handoff = new Script('(' + source[1] + ')').runInNewContext(context);
+  handoff();
+  assert.equal(destination, 'robots');
+  assert.equal(focused, 'manage', 'Focus must reach the control for managing full profiles');
+  assert.deepEqual([fields.robotNickname.value, fields.robotBrand.value, fields.robotModel.value],
+    ['Unsaved nickname', 'Unsaved brand', 'Unsaved model'], 'Do not overwrite unsaved entries at capacity');
+  assert.match(fields.robotMessage.textContent, /limit reached \(30\).*Remove a saved profile/i);
+  assert.equal(context.mine.length, 30, 'No profile is added or removed automatically');
+
+  context.mine.pop();
+  focused = null;
+  handoff();
+  assert.equal(fields.robotNickname.value, 'Home Robot Concept', 'Normal prefill still works below the limit');
+  assert.equal(fields.robotBrand.value, '');
+  assert.equal(fields.robotModel.value, '');
+  assert.equal(focused, 'brand');
 });
