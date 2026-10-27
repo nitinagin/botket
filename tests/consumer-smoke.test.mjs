@@ -176,6 +176,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   render();
   assert.equal(elements.total.textContent, 'Total: ฿36,400');
   assert.equal(elements.count.textContent, 2);
+  assert.equal(elements.clearCart.textContent, 'Clear all 2 demo cart items');
   assert.equal(elements.reviewServicesCart.hidden, false);
   assert.equal(elements.reviewServicesCart.textContent, 'Review demo cart (2 items) →');
   assert.equal(elements.checkoutToRobots.hidden, true);
@@ -184,6 +185,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.deepEqual(context.cart.map(item => item.id), ['s1']);
   assert.equal(elements.total.textContent, 'Total: ฿1,500');
   assert.equal(elements.count.textContent, 1);
+  assert.equal(elements.clearCart.textContent, 'Clear all 1 demo cart item');
   assert.equal(elements.reviewServicesCart.textContent, 'Review demo cart (1 item) →');
   assert.equal(focused, elements.items.children[0].children[1]);
 
@@ -192,6 +194,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.equal(elements.total.textContent, 'Total: ฿0');
   assert.equal(elements.reviewServicesCart.hidden, true);
   assert.equal(elements.preview.disabled, true);
+  assert.equal(elements.clearCart.textContent, 'Clear cart');
   assert.equal(elements.name.value, '');
   assert.equal(focused, elements.items.children[1]);
 
@@ -201,6 +204,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   const clear = new Script('(' + clearSource[1] + ')').runInNewContext(context);
   clear();
   assert.equal(context.cart.length, 2, 'Cancel preserves cart');
+  assert.equal(elements.clearCart.textContent, 'Clear all 2 demo cart items');
   confirmed = true;
   clear();
   assert.equal(context.cart.length, 0);
