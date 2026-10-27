@@ -404,7 +404,12 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.equal(picker.value, second.id);
   assert.equal(picker.disabled, false);
   assert.equal(focusCalls, 1, 'Rebuilding the selector must preserve keyboard focus');
-  assert.match(summary.textContent, /Viewing generic skill previews from Study helper/);
+  assert.match(summary.textContent, /Viewing generic skill previews for local demo profile: Study helper — Example · B/);
+  context.mine[0].name = 'Study helper';
+  context.selectedRobotId = first.id;
+  update();
+  assert.match(summary.textContent, /Study helper — Example · A/, 'Same-nickname profiles must show the selected brand and model');
+  assert.doesNotMatch(summary.textContent, /Study helper — Example · B/, 'Do not display another profile with the same nickname');
   assert.match(summary.textContent, /Compatibility has not been checked/);
   assert.match(summary.textContent, /installation is unavailable/i);
 
