@@ -590,7 +590,8 @@ test('service-only journey returns to Services without suggesting a real booking
     name: { value: '' },
     result: { textContent: '' },
     checkoutToRobots: { hidden: true, textContent: '' },
-    robotMessage: { textContent: '' }
+    robotMessage: { textContent: '' },
+    serviceRobotContext: { textContent: '' }
   };
   const visited = [];
   const context = {
@@ -619,6 +620,8 @@ test('service-only journey returns to Services without suggesting a real booking
   returnToServices();
   assert.equal(visited.at(-1), 'services');
   assert.equal(elements.robotMessage.textContent, '', 'Service-only preview does not suggest robot ownership');
+  assert.match(elements.serviceRobotContext.textContent, /no service was booked and no payment was taken/);
+  assert.match(elements.serviceRobotContext.textContent, /eligibility and compatibility remain unverified/);
   addService();
   assert.equal(context.cart.length, 1, 'Returning to Services must not allow a duplicate');
   assert.match(elements.result.textContent, /already in your cart/i);
