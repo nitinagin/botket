@@ -1348,3 +1348,51 @@ test('Discover and Services demo add buttons have distinct accessible names', ()
   assert.match(actions.s1, />Add demo service<\/button>/);
   assert.match(page, /No bookings, service requests or payments are available/);
 });
+
+test('Discover offers a synchronized demo cart review shortcut without real checkout', () => {
+  assert.match(page, /id="reviewDiscoverCart" hidden>Review demo cart/);
+  const handler = app.match(/byId\\('reviewDiscoverCart'\\)\\.onclick=(\\(\\)=>show\\('cart'\\));/);
+  assert.ok(handler, 'Expected Discover-to-Checkout handler');
+  let destination;
+  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  assert.equal(destination, 'cart');
+
+  const source = app.match(/function renderCart\\(\\)\\{[^\\n]*\\}/);
+  assert.ok(source, 'Expected demo cart renderer');
+  const node = () => ({
+    children: [], attributes: {}, textContent: '',
+    replaceChildren(...children) { this.children = children; },
+    append(...children) { this.children.push(...children); },
+    setAttribute(name, value) { this.attributes[name] = value; }
+  });
+  const elements = Object.fromEntries(
+    ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
+      'reviewDiscoverCart', 'clearCart', 'browseFromCheckout',
+      'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
+  );
+  elements.checkoutToRobots.hidden = true;
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const service = { id: 's1', name: 'Robot Setup', price: 1500 };
+  const context = {
+    cart: [], robots: [robot], services: [service], lastBrowseTab: 'store',
+    byId: id => elements[id], document: { createElement: node },
+    money: value => '฿' + value.toLocaleString('en-US'),
+    show: () => {}
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+  render();
+  assert.equal(elements.reviewDiscoverCart.hidden, true);
+  assert.equal(elements.reviewServicesCart.hidden, true);
+  context.cart = [robot];
+  render();
+  assert.equal(elements.reviewDiscoverCart.hidden, false);
+  assert.equal(elements.reviewDiscoverCart.textContent, 'Review demo cart (1 item) →');
+  assert.equal(elements.reviewDiscoverCart.textContent, elements.reviewServicesCart.textContent);
+  context.cart = [robot, service];
+  render();
+  assert.equal(elements.reviewDiscoverCart.textContent, 'Review demo cart (2 items) →');
+  context.cart = [];
+  render();
+  assert.equal(elements.reviewDiscoverCart.hidden, true);
+  assert.match(page, /No products are available to order through this demo/i);
+});
