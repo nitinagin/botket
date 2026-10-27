@@ -578,7 +578,7 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
 test('service-only journey returns to Services without suggesting a real booking', () => {
   const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
   const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
-  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   assert.ok(addSource && previewSource && handoffSource, 'Expected service cart and preview handlers');
 
   const service = { id: 's2', name: 'Maintenance', price: 1300 };
@@ -586,7 +586,8 @@ test('service-only journey returns to Services without suggesting a real booking
   const elements = {
     name: { value: '' },
     result: { textContent: '' },
-    checkoutToRobots: { hidden: true, textContent: '' }
+    checkoutToRobots: { hidden: true, textContent: '' },
+    robotMessage: { textContent: '' }
   };
   const visited = [];
   const context = {
@@ -614,6 +615,7 @@ test('service-only journey returns to Services without suggesting a real booking
 
   returnToServices();
   assert.equal(visited.at(-1), 'services');
+  assert.equal(elements.robotMessage.textContent, '', 'Service-only preview does not suggest robot ownership');
   addService();
   assert.equal(context.cart.length, 1, 'Returning to Services must not allow a duplicate');
   assert.match(elements.result.textContent, /already in your cart/i);
@@ -656,7 +658,7 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
 test('mixed robot and service preview routes to My Robots without claiming ownership', () => {
   const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
   const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
-  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  const handoffSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   assert.ok(addSource && previewSource && handoffSource, 'Expected mixed cart and preview handlers');
 
   const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
@@ -664,7 +666,8 @@ test('mixed robot and service preview routes to My Robots without claiming owner
   const elements = {
     name: { value: '' },
     result: { textContent: '' },
-    checkoutToRobots: { hidden: true, textContent: '' }
+    checkoutToRobots: { hidden: true, textContent: '' },
+    robotMessage: { textContent: '' }
   };
   const visited = [];
   const context = {
@@ -693,6 +696,7 @@ test('mixed robot and service preview routes to My Robots without claiming owner
 
   continueFromCheckout();
   assert.equal(visited.at(-1), 'robots', 'Mixed carts should lead to optional local profiles');
+  assert.match(elements.robotMessage.textContent, /does not confirm purchase, ownership, compatibility or hardware connection/i);
   assert.equal(context.mine.length, 0, 'Previewing an order must never create or verify ownership');
 });
 
@@ -900,7 +904,7 @@ test('Escape clears My Robots search while leaving other keys alone', () => {
 test('robot concept to checkout to local profile to skills to services stays demo-only', () => {
   const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
   const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
-  const checkoutSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  const checkoutSource = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   const registerSource = app.match(/function addDemoRobot\(name,brand,model\)\{[^\n]*\}/);
   const skillsSource = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/);
   const servicesSource = app.split("byId('openServicesFromSkills').onclick=")[1]?.split(';')[0];
@@ -955,6 +959,7 @@ test('robot concept to checkout to local profile to skills to services stays dem
   assert.match(elements.result.textContent, /No payment or order submission occurred/);
   checkout();
   assert.equal(visited.at(-1), 'robots');
+  assert.match(elements.robotMessage.textContent, /does not confirm purchase, ownership, compatibility or hardware connection/i);
   assert.equal(context.mine.length, 0, 'Checkout never grants ownership or creates a profile');
 
   assert.equal(register('Home helper', 'Example Maker', 'Model A'), true);
