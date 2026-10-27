@@ -1262,3 +1262,58 @@ test('duplicate nicknames have distinct profile action labels and a specific rem
   assert.deepEqual(context.mine.map(profile => profile.id), ['demo-1']);
   assert.equal(saves, 1, 'Confirming removes only the named profile');
 });
+
+test('Services picker changes local demo context without suggesting compatibility or bookings', () => {
+  assert.match(page, /id="serviceRobotSelect"[^>]*aria-describedby="serviceRobotContext"/);
+  const source = app.match(/function updateServicesContext\(\)\{[^\n]*\}/);
+  const handler = app.match(/byId\('serviceRobotSelect'\)\.addEventListener\('change',(e=>\{[^\n]*\})\);/);
+  assert.ok(source && handler, 'Expected Services selector renderer and change handler');
+
+  let focusCalls = 0, skillsUpdates = 0;
+  const picker = {
+    children: [], value: '', disabled: false,
+    replaceChildren() { this.children = []; },
+    append(option) { this.children.push(option); },
+    focus() { focusCalls++; }
+  };
+  const notice = { textContent: '' };
+  const first = { id: 'demo-1', name: 'Helper', brand: 'Example Maker', model: 'A' };
+  const second = { id: 'demo-2', name: 'Helper', brand: 'Another Maker', model: 'B' };
+  const context = {
+    mine: [first, second], selectedRobotId: second.id,
+    byId: id => id === 'serviceRobotSelect' ? picker : notice,
+    document: { activeElement: picker, createElement: () => ({ value: '', textContent: '' }) },
+    updateSkillsRobotSummary: () => { skillsUpdates++; }
+  };
+  context.updateServicesContext = new Script('(' + source[0] + ')').runInNewContext(context);
+  const onChange = new Script('(' + handler[1] + ')').runInNewContext(context);
+
+  context.updateServicesContext();
+  assert.deepEqual(picker.children.map(option => option.value), ['', first.id, second.id]);
+  assert.equal(picker.value, second.id);
+  assert.equal(picker.disabled, false);
+  assert.match(notice.textContent, /Another Maker · B/);
+  assert.match(notice.textContent, /compatibility are unverified/);
+  assert.match(notice.textContent, /no booking is available/);
+  assert.equal(focusCalls, 1, 'Rebuilding the picker preserves keyboard focus');
+
+  onChange({ target: { value: first.id } });
+  assert.equal(context.selectedRobotId, first.id);
+  assert.equal(picker.value, first.id);
+  assert.match(notice.textContent, /Example Maker · A/);
+  assert.doesNotMatch(notice.textContent, /Another Maker · B/);
+  assert.equal(skillsUpdates, 1, 'Skills must use the same selected demo profile');
+
+  onChange({ target: { value: '' } });
+  assert.equal(context.selectedRobotId, null);
+  assert.equal(picker.value, '');
+  assert.match(notice.textContent, /not matched to any robot/);
+  assert.equal(skillsUpdates, 2);
+
+  context.mine = [];
+  context.updateServicesContext();
+  assert.equal(picker.disabled, true);
+  assert.deepEqual(picker.children.map(option => option.value), ['']);
+  assert.match(notice.textContent, /compatibility are unverified/);
+  assert.equal(context.mine.length, 0, 'Preview selection must not create profiles');
+});
