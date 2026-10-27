@@ -1062,3 +1062,45 @@ test('Discover no-results recovery clears both filters and restores all demo con
   assert.match(elements.products.innerHTML, /Companion Robot Concept/);
   assert.equal(catalog.length, 2, 'Recovery must not modify catalog');
 });
+
+test('demo registration rejects invalid details before changing saved profiles', () => {
+  const source = app.match(/function addDemoRobot\(name,brand,model\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected demo registration guard');
+  const mine = [];
+  const elements = {
+    robotMessage: { textContent: '' },
+    profileSearch: { value: 'existing search' }
+  };
+  let saves = 0, visits = 0, ids = 0;
+  const context = {
+    mine, selectedRobotId: null,
+    byId: id => elements[id],
+    demoId: () => { ids++; return 'DEMO-1'; },
+    saveRobots: () => { saves++; return true; },
+    show: () => { visits++; }
+  };
+  const add = new Script('(' + source[0] + ')').runInNewContext(context);
+  const invalid = [
+    ['', 'Maker', 'A'], ['   ', 'Maker', 'A'],
+    ['Home', '', 'A'], ['Home', 'Maker', '   '],
+    ['x'.repeat(41), 'Maker', 'A'],
+    ['Home', 'x'.repeat(41), 'A'],
+    ['Home', 'Maker', 'x'.repeat(61)],
+    [null, 'Maker', 'A']
+  ];
+  for (const details of invalid) {
+    assert.equal(add(...details), false, 'Invalid details must be rejected');
+    assert.equal(mine.length, 0, 'Invalid registration must not add a profile');
+  }
+  assert.equal(saves, 0, 'Invalid details must not write browser storage');
+  assert.equal(ids, 0, 'Invalid details must not allocate a profile ID');
+  assert.equal(visits, 0, 'Invalid details must not navigate');
+  assert.equal(elements.profileSearch.value, 'existing search');
+  assert.match(elements.robotMessage.textContent, /No demo profile was saved/);
+
+  assert.equal(add('Home', 'Maker', 'A'), true, 'Valid demo details still work');
+  assert.equal(mine.length, 1);
+  assert.equal(saves, 1);
+  assert.equal(ids, 1);
+  assert.equal(visits, 1);
+});
