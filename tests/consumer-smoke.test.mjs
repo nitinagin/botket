@@ -417,13 +417,14 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.match(summary.textContent, /Compatibility has not been checked/);
   assert.match(summary.textContent, /installation is unavailable/i);
 
+  const focusCallsBeforeBlur = focusCalls;
   context.selectedRobotId = 'deleted-profile';
   context.document.activeElement = null;
   update();
   assert.equal(context.selectedRobotId, null, 'Deleted profiles must not remain selected');
   assert.equal(picker.value, '');
   assert.match(summary.textContent, /2 local demo robot profile\(s\) saved/);
-  assert.equal(focusCalls, 1, 'Do not steal focus from another control');
+  assert.equal(focusCalls, focusCallsBeforeBlur, 'Do not steal focus from another control');
 
   context.mine = [];
   update();
