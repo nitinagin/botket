@@ -173,13 +173,13 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
-  let confirmed = false;
+  let confirmed = false, confirmationMessage = '';
   const context = {
     cart: [robot, service], robots: [robot], services: [service],
     lastBrowseTab: 'store', byId: id => elements[id],
     money: n => '฿' + n.toLocaleString('en-US'),
     document: { createElement: node },
-    window: { confirm: () => confirmed },
+    window: { confirm: message => { confirmationMessage = message; return confirmed; } },
     show: () => {}
   };
   context.renderCart = new Script('(' + renderSource[0] + ')').runInNewContext(context);
@@ -217,6 +217,8 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   const clear = new Script('(' + clearSource[1] + ')').runInNewContext(context);
   clear();
   assert.equal(context.cart.length, 2, 'Cancel preserves cart');
+  assert.match(confirmationMessage, /Clear all 2 demo cart items \(1 robot concept, 1 service preview\)/);
+  assert.match(confirmationMessage, /This cannot be undone\. No order has been placed/);
   assert.equal(elements.clearCart.textContent, 'Clear all 2 demo cart items');
   confirmed = true;
   clear();
@@ -225,6 +227,13 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.equal(elements.preview.disabled, true);
   assert.equal(elements.name.value, '');
   assert.match(elements.result.textContent, /Cart cleared\. No order was placed/i);
+
+  context.cart = [service];
+  confirmed = false;
+  render();
+  clear();
+  assert.equal(context.cart.length, 1, 'Cancel preserves a service-only demo cart');
+  assert.match(confirmationMessage, /Clear all 1 demo cart item \(0 robot concepts, 1 service preview\)/);
 });
 
 test('demo robot profile registration selects new profiles and protects duplicates and the limit', () => {
