@@ -72,7 +72,8 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
       name: { value: scenario.name },
       result: { textContent: '' },
       checkoutToRobots: { hidden: true, textContent: '' },
-      robotMessage: { textContent: '' }
+      robotMessage: { textContent: '' },
+      serviceRobotContext: { textContent: '' }
     };
     let destination;
     const context = {
@@ -94,6 +95,8 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
         assert.match(elements.robotMessage.textContent, /does not confirm purchase, ownership, compatibility or hardware connection/i);
       } else {
         assert.equal(elements.robotMessage.textContent, '', 'Service-only handoff does not alter robot profile status');
+        assert.match(elements.serviceRobotContext.textContent, /Service-only demo checkout preview: no service was booked and no payment was taken/);
+        assert.match(elements.serviceRobotContext.textContent, /eligibility and compatibility remain unverified/);
       }
     }
   }
