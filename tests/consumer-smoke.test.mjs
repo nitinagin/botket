@@ -156,7 +156,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
-      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart'].map(id => [id, node()])
+      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart', 'reviewRobotsCart'].map(id => [id, node()])
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
@@ -1367,7 +1367,7 @@ test('Discover offers a synchronized demo cart review shortcut without real chec
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
-      'reviewDiscoverCart', 'clearCart', 'browseFromCheckout',
+      'reviewDiscoverCart', 'reviewRobotsCart', 'clearCart', 'browseFromCheckout',
       'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
   );
   elements.checkoutToRobots.hidden = true;
@@ -1440,5 +1440,49 @@ test('Discover and Services mark already-added demo items without duplicating ch
   assert.doesNotMatch(actions.s1, / disabled /, 'Removed service can be added again');
   assert.match(actions.r1, />Add to demo cart<\/button>/);
   assert.match(actions.s1, />Add demo service<\/button>/);
+  assert.match(page, /No payment, reservation or order submission occurs/);
+});
+
+test('My Robots offers a synchronized demo cart review shortcut without real checkout', () => {
+  assert.match(page, /id="reviewRobotsCart" hidden>Review demo cart/);
+  const handler = app.match(/byId\('reviewRobotsCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.ok(handler, 'Expected My Robots-to-Checkout handler');
+  let destination;
+  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  assert.equal(destination, 'cart');
+
+  const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected cart renderer');
+  const node = () => ({
+    children: [], textContent: '', hidden: false,
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute() {}
+  });
+  const elements = Object.fromEntries(
+    ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
+      'reviewDiscoverCart', 'reviewRobotsCart', 'clearCart', 'browseFromCheckout',
+      'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
+  );
+  elements.checkoutToRobots.hidden = true;
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const context = {
+    cart: [], robots: [robot], services: [], lastBrowseTab: 'store',
+    byId: id => elements[id], document: { createElement: node },
+    money: value => '฿' + value.toLocaleString('en-US'),
+    show: () => {}
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+  render();
+  assert.equal(elements.reviewRobotsCart.hidden, true, 'Empty cart hides the shortcut');
+  context.cart = [robot];
+  render();
+  assert.equal(elements.reviewRobotsCart.hidden, false);
+  assert.equal(elements.reviewRobotsCart.textContent, 'Review demo cart (1 item) →');
+  assert.equal(elements.reviewRobotsCart.textContent, elements.reviewDiscoverCart.textContent);
+  assert.equal(elements.reviewRobotsCart.textContent, elements.reviewServicesCart.textContent);
+  context.cart = [];
+  render();
+  assert.equal(elements.reviewRobotsCart.hidden, true, 'Removing items hides the shortcut');
   assert.match(page, /No payment, reservation or order submission occurs/);
 });
