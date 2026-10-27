@@ -1210,3 +1210,55 @@ test('Services offers a demo cart review route only when items exist', () => {
   assert.match(app, /byId\('reviewServicesCart'\)\.hidden=!cart\.length/);
   assert.match(page, /No bookings, service requests or payments are available/);
 });
+
+
+test('duplicate nicknames have distinct profile action labels and a specific removal confirmation', () => {
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected My Robots profile renderer');
+  const node = () => ({
+    children: [], attributes: {},
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    querySelectorAll(selector) {
+      const key = selector.slice(1, -1);
+      const walk = item => [item, ...(item.children || []).flatMap(walk)];
+      return this.children.flatMap(walk).filter(item => Object.hasOwn(item.attributes || {}, key));
+    },
+    focus() {}
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'profileCount', 'clearProfiles', 'profileSearch',
+      'profileSearchSummary', 'clearProfileSearch', 'robotMessage', 'robotNickname'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  let prompt = '', approved = false, saves = 0;
+  const context = {
+    mine: [
+      { id: 'demo-1', name: 'Study Helper', brand: 'Example Robotics', model: 'A-1' },
+      { id: 'demo-2', name: 'Study Helper', brand: 'Sample Maker', model: 'B-2' }
+    ],
+    selectedRobotId: null,
+    byId: id => elements[id],
+    document: { createElement: node },
+    window: { confirm: message => { prompt = message; return approved; } },
+    saveRobots: () => { saves++; return true; },
+    updateSkillsRobotSummary: () => {},
+    show: () => {}
+  };
+  context.renderMyRobots = new Script('(' + source[0] + ')').runInNewContext(context);
+  context.renderMyRobots();
+  const [newest, oldest] = elements.myrobots.children;
+  for (const index of [4, 5, 6]) {
+    assert.match(newest.children[index].attributes['aria-label'], /Sample Maker · B-2/);
+    assert.match(oldest.children[index].attributes['aria-label'], /Example Robotics · A-1/);
+  }
+  newest.children[6].onclick();
+  assert.match(prompt, /Study Helper — Sample Maker · B-2/);
+  assert.equal(context.mine.length, 2, 'Cancelling must preserve both profiles');
+  assert.equal(saves, 0, 'Cancelling must not write browser storage');
+  approved = true;
+  newest.children[6].onclick();
+  assert.deepEqual(context.mine.map(profile => profile.id), ['demo-1']);
+  assert.equal(saves, 1, 'Confirming removes only the named profile');
+});
