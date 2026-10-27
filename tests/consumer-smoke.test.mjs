@@ -1319,7 +1319,7 @@ test('Services picker changes local demo context without suggesting compatibilit
 });
 
 test('Discover and Services demo add buttons have distinct accessible names', () => {
-  const source = app.match(/function render\\(\\)\\{[\\s\\S]*?\\n(?=function show\\()/);
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
   assert.ok(source, 'Expected the shared catalog renderer');
   const actions = {};
   const elements = {
@@ -1342,9 +1342,9 @@ test('Discover and Services demo add buttons have distinct accessible names', ()
     document: { querySelectorAll: () => [] }
   };
   new Script('(' + source[0].trim() + ')').runInNewContext(context)();
-  assert.match(actions.r1, /type="button"[^>]*aria-label="Add Home Robot Concept to demo cart \\(preview only\\)"/);
-  assert.match(actions.s1, /type="button"[^>]*aria-label="Add Robot Setup service preview to demo cart \\(no booking\\)"/);
-  assert.match(actions.r1, />Add to demo cart<\\/button>/);
-  assert.match(actions.s1, />Add demo service<\\/button>/);
+  assert.match(actions.r1, /type="button"[^>]*aria-label="Add Home Robot Concept to demo cart \(preview only\)"/);
+  assert.match(actions.s1, /type="button"[^>]*aria-label="Add Robot Setup service preview to demo cart \(no booking\)"/);
+  assert.match(actions.r1, />Add to demo cart<\/button>/);
+  assert.match(actions.s1, />Add demo service<\/button>/);
   assert.match(page, /No bookings, service requests or payments are available/);
 });
