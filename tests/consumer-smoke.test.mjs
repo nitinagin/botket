@@ -497,14 +497,17 @@ test('discover filters and concept-to-profile handoff preserve demo-only behavio
     robotModel: { value: 'Old model' },
     robotMessage: { textContent: '' }
   };
+  let overwritePrompts = 0;
   const profileContext = {
     robots: [{ id: 'r2', name: 'Companion Robot Concept' }], mine: [],
     b: { dataset: { robot: 'r2' } },
     byId: id => fields[id],
+    window: { confirm: () => { overwritePrompts++; return true; } },
     show: tab => { destination = tab; }
   };
   const prefill = new Script('(' + profileSource[1] + ')').runInNewContext(profileContext);
   prefill();
+  assert.equal(overwritePrompts, 1, 'Prefilling over an unsaved draft requires confirmation');
   assert.equal(fields.robotNickname.value, 'Companion Robot Concept');
   assert.equal(fields.robotBrand.value, '', 'Never infer a real manufacturer from a concept');
   assert.equal(fields.robotModel.value, '', 'Never infer a compatible device model');
@@ -1664,11 +1667,13 @@ test('Discover concept handoff protects unsaved profile fields when 30 demo prof
     robotMessage: { textContent: '' },
     clearProfiles: { focus() { focused = 'manage'; } }
   };
+  let confirmed = false, prompts = 0;
   const context = {
     robots: [{ id: 'r1', name: 'Home Robot Concept' }],
     mine: Array.from({ length: 30 }, (_, i) => ({ id: 'demo-' + i })),
     b: { dataset: { robot: 'r1' } },
     byId: id => fields[id],
+    window: { confirm: () => { prompts++; return confirmed; } },
     show: tab => { destination = tab; }
   };
   const handoff = new Script('(' + source[1] + ')').runInNewContext(context);
@@ -1680,9 +1685,19 @@ test('Discover concept handoff protects unsaved profile fields when 30 demo prof
   assert.match(fields.robotMessage.textContent, /limit reached \(30\).*Remove a saved profile/i);
   assert.equal(context.mine.length, 30, 'No profile is added or removed automatically');
 
+  assert.equal(prompts, 0, 'At capacity no overwrite confirmation is needed');
   context.mine.pop();
   focused = null;
+  destination = null;
   handoff();
+  assert.equal(prompts, 1, 'Unsaved form entries require confirmation before replacement');
+  assert.equal(destination, null, 'Cancelling must leave the user on Discover');
+  assert.deepEqual([fields.robotNickname.value, fields.robotBrand.value, fields.robotModel.value],
+    ['Unsaved nickname', 'Unsaved brand', 'Unsaved model'], 'Cancel preserves every unsaved field');
+  assert.equal(focused, null, 'Cancel must not steal keyboard focus');
+  confirmed = true;
+  handoff();
+  assert.equal(prompts, 2, 'Confirming permits a deliberate replacement');
   assert.equal(fields.robotNickname.value, 'Home Robot Concept', 'Normal prefill still works below the limit');
   assert.equal(fields.robotBrand.value, '');
   assert.equal(fields.robotModel.value, '');
