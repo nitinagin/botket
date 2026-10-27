@@ -34,7 +34,7 @@ test('checkout and skills clearly remain demos', () => {
   assert.match(page, /This is an order preview, not a real checkout/i);
   assert.match(page, /No payment, reservation or order submission occurs/i);
   assert.match(page, /Compatibility is not verified, and installation is unavailable/i);
-  assert.match(page, /disabled aria-disabled="true">Install unavailable/);
+  assert.match(page, /disabled aria-disabled="true"[^>]*>Install unavailable/);
   assert.match(page, /Leave blank to preview as Guest/);
 });
 
