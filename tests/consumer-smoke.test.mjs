@@ -53,15 +53,17 @@ test('demo cart guards and section handoffs remain present', () => {
 
 test('demo checkout preview and handoff handle robot, service, mixed and empty carts', () => {
   const preview = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
-  const handoff = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>show\([^\n]*\));/);
+  const handoff = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   assert.ok(preview && handoff, 'Expected both demo checkout handlers');
 
   const robot = { id: 'r1', price: 34900 };
+  const secondRobot = { id: 'r2', price: 24900 };
   const service = { id: 's1', price: 1500 };
   const cases = [
     { label: 'robot-only guest', items: [robot], name: '', expected: 'Preview for Guest: 1 robot concept(s), 0 service preview(s), total ฿34,900', destination: 'robots' },
     { label: 'service-only named', items: [service], name: 'Alex', expected: 'Preview for Alex: 0 robot concept(s), 1 service preview(s), total ฿1,500', destination: 'services' },
     { label: 'mixed guest', items: [robot, service], name: '', expected: 'Preview for Guest: 1 robot concept(s), 1 service preview(s), total ฿36,400', destination: 'robots' },
+    { label: 'two robot concepts', items: [robot, secondRobot], name: '', expected: 'Preview for Guest: 2 robot concept(s), 0 service preview(s), total ฿59,800', destination: 'robots' },
     { label: 'empty cart', items: [], name: '', expected: 'Add an item to preview a demo order.', destination: null }
   ];
 
@@ -69,12 +71,13 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
     const elements = {
       name: { value: scenario.name },
       result: { textContent: '' },
-      checkoutToRobots: { hidden: true, textContent: '' }
+      checkoutToRobots: { hidden: true, textContent: '' },
+      robotMessage: { textContent: '' }
     };
     let destination;
     const context = {
       cart: scenario.items,
-      robots: [robot],
+      robots: [robot, secondRobot],
       byId: id => elements[id],
       money: n => '฿' + n.toLocaleString('en-US'),
       show: tab => { destination = tab; }
@@ -85,6 +88,13 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
     if (scenario.destination) {
       new Script('(' + handoff[1] + ')').runInNewContext(context)();
       assert.equal(destination, scenario.destination, scenario.label);
+      const robotCount = scenario.items.filter(item => item.id === robot.id || item.id === secondRobot.id).length;
+      if (robotCount) {
+        assert.ok(elements.robotMessage.textContent.includes('demo preview for ' + robotCount + ' robot concept' + (robotCount === 1 ? '' : 's')), scenario.label);
+        assert.match(elements.robotMessage.textContent, /does not confirm purchase, ownership, compatibility or hardware connection/i);
+      } else {
+        assert.equal(elements.robotMessage.textContent, '', 'Service-only handoff does not alter robot profile status');
+      }
     }
   }
 });
