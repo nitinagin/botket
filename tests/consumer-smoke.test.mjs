@@ -156,7 +156,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
-      'preview', 'checkoutToRobots', 'name', 'result'].map(id => [id, node()])
+      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart'].map(id => [id, node()])
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
@@ -176,17 +176,21 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   render();
   assert.equal(elements.total.textContent, 'Total: ฿36,400');
   assert.equal(elements.count.textContent, 2);
+  assert.equal(elements.reviewServicesCart.hidden, false);
+  assert.equal(elements.reviewServicesCart.textContent, 'Review demo cart (2 items) →');
   assert.equal(elements.checkoutToRobots.hidden, true);
 
   elements.items.children[0].children[1].onclick();
   assert.deepEqual(context.cart.map(item => item.id), ['s1']);
   assert.equal(elements.total.textContent, 'Total: ฿1,500');
   assert.equal(elements.count.textContent, 1);
+  assert.equal(elements.reviewServicesCart.textContent, 'Review demo cart (1 item) →');
   assert.equal(focused, elements.items.children[0].children[1]);
 
   elements.items.children[0].children[1].onclick();
   assert.equal(context.cart.length, 0);
   assert.equal(elements.total.textContent, 'Total: ฿0');
+  assert.equal(elements.reviewServicesCart.hidden, true);
   assert.equal(elements.preview.disabled, true);
   assert.equal(elements.name.value, '');
   assert.equal(focused, elements.items.children[1]);
@@ -1192,4 +1196,16 @@ test('My Robots opens generic Services with the chosen demo profile, without com
   assert.match(elements.serviceRobotContext.textContent, /compatibility are unverified/i);
   assert.match(elements.serviceRobotContext.textContent, /no booking is available/i);
   assert.equal(context.mine.length, 2, 'Navigation must not modify saved profiles');
+});
+
+
+test('Services offers a demo cart review route only when items exist', () => {
+  assert.match(page, /id="reviewServicesCart" hidden>Review demo cart/);
+  const source = app.match(/byId\('reviewServicesCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.ok(source, 'Expected Services-to-Checkout handler');
+  let destination;
+  new Script('(' + source[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  assert.equal(destination, 'cart');
+  assert.match(app, /byId\('reviewServicesCart'\)\.hidden=!cart\.length/);
+  assert.match(page, /No bookings, service requests or payments are available/);
 });
