@@ -269,12 +269,12 @@ test('clearing all demo profiles requires confirmation and resets skill selectio
     robotMessage: { textContent: '' },
     robotNickname: { focus() { focused = true; } }
   };
-  let focused = false, confirmed = false, saves = 0, renders = 0, summaries = 0, prompts = 0;
+  let focused = false, confirmed = false, saves = 0, renders = 0, summaries = 0, prompts = 0, promptText = '';
   const context = {
     mine: [{ id: 'demo-1', name: 'Test robot', brand: 'Demo', model: 'A' }],
     selectedRobotId: 'demo-1',
     byId: id => elements[id],
-    window: { confirm: () => { prompts++; return confirmed; } },
+    window: { confirm: message => { promptText = message; prompts++; return confirmed; } },
     saveRobots: () => { saves++; return true; },
     renderMyRobots: () => { renders++; },
     updateSkillsRobotSummary: () => { summaries++; }
@@ -283,6 +283,7 @@ test('clearing all demo profiles requires confirmation and resets skill selectio
 
   clear();
   assert.equal(context.mine.length, 1, 'Cancel must preserve demo profiles');
+  assert.match(promptText, /including profiles hidden by your search/i, 'Filtered clear-all must warn about hidden profiles');
   assert.equal(context.selectedRobotId, 'demo-1');
   assert.equal(elements.profileSearch.value, 'search term');
   assert.equal(saves, 0);
@@ -806,6 +807,7 @@ test('My Robots search normalizes whitespace and case without changing saved det
 
   render();
   assert.match(elements.profileSearchSummary.textContent, /Showing 1 of 2 matching/);
+  assert.match(elements.clearProfiles.textContent, /Clear all 2 demo profiles \(including profiles hidden by search\)/, 'Clear-all label must warn while filtered');
   assert.equal(elements.clearProfileSearch.hidden, false, 'Clear search is available with matching results');
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].children[0].textContent, 'Home   Helper');
@@ -840,6 +842,7 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.equal(elements.profileSearch.focused, true, 'Clearing search restores keyboard focus');
   assert.equal(root.children.length, 2);
   assert.match(elements.profileSearchSummary.textContent, /Showing all 2 demo profile/);
+  assert.equal(elements.clearProfiles.textContent, 'Clear all 2 demo profiles', 'Unfiltered clear-all label remains concise');
   assert.equal(elements.clearProfileSearch.hidden, true, 'Clear search hides when query is empty');
 });
 
