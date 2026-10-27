@@ -1139,3 +1139,52 @@ test('Services shows selected demo profile without implying verified service com
   assert.match(notice.textContent, /not matched to any robot/i);
   assert.equal(context.mine.length, 0, 'Services must not create robot profiles');
 });
+
+test('My Robots opens generic Services with the chosen demo profile, without compatibility claims', () => {
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  const contextSource = app.match(/function updateServicesContext\(\)\{[^\n]*\}/);
+  assert.ok(source && contextSource, 'Expected profile and Services context renderers');
+  const node = () => ({
+    children: [], attributes: {},
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    focus() {}
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'profileCount', 'clearProfiles', 'profileSearch',
+      'profileSearchSummary', 'clearProfileSearch'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const visits = [];
+  const context = {
+    mine: [
+      { id: 'demo-1', name: 'Study Helper', brand: 'Example Robotics', model: 'A-1' },
+      { id: 'demo-2', name: 'Study Helper', brand: 'Sample Maker', model: 'B-2' }
+    ],
+    selectedRobotId: null,
+    byId: id => elements[id],
+    document: { createElement: node },
+    show: tab => visits.push(tab)
+  };
+  const renderProfiles = new Script('(' + source[0] + ')').runInNewContext(context);
+  const updateContext = new Script('(' + contextSource[0] + ')').runInNewContext(context);
+  renderProfiles();
+  const newest = elements.myrobots.children[0];
+  const servicesButton = newest.children.find(child =>
+    child.textContent === 'Explore generic service previews (demo) →');
+  assert.ok(servicesButton, 'Each profile should offer a direct generic Services route');
+  assert.match(servicesButton.attributes['aria-label'], /compatibility not verified/i);
+  assert.equal(newest.children.at(-1).textContent, 'Remove profile',
+    'Existing removal control stays available');
+  servicesButton.onclick();
+  assert.equal(context.selectedRobotId, 'demo-2', 'Choose the clicked profile, not another with the same nickname');
+  assert.deepEqual(visits, ['services']);
+  elements.serviceRobotContext = { textContent: '' };
+  updateContext();
+  assert.match(elements.serviceRobotContext.textContent, /Sample Maker · B-2/);
+  assert.doesNotMatch(elements.serviceRobotContext.textContent, /Example Robotics · A-1/);
+  assert.match(elements.serviceRobotContext.textContent, /compatibility are unverified/i);
+  assert.match(elements.serviceRobotContext.textContent, /no booking is available/i);
+  assert.equal(context.mine.length, 2, 'Navigation must not modify saved profiles');
+});
