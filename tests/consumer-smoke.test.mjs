@@ -1627,3 +1627,27 @@ test('Skills disabled install buttons identify each preview without claiming com
   }
   assert.match(page, /Compatibility is not verified, and installation is unavailable/);
 });
+
+
+test('My Robots disables profile submission at 30 saved demos and re-enables it after removal', () => {
+  assert.match(page, /id="saveDemoProfile" type="submit" aria-describedby="profileCount"/);
+  assert.match(app, /function renderMyRobots\(\)\{[^\n]*const remaining=30-mine.length;const save=/);
+  const source = app.match(/const save=byId\('saveDemoProfile'\);if\(save\)\{[^}]+\}/);
+  assert.ok(source, 'Expected save-button limit guard in My Robots renderer');
+  const button = { disabled: false, textContent: '' };
+  const update = (remaining, available = true) => new Script(source[0]).runInNewContext({
+    remaining, byId: id => id === 'saveDemoProfile' && available ? button : null
+  });
+  update(30);
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'Save demo profile');
+  update(1);
+  assert.equal(button.disabled, false);
+  update(0);
+  assert.equal(button.disabled, true, 'A full collection must block futile submissions');
+  assert.equal(button.textContent, 'Demo profile limit reached (30)');
+  update(1);
+  assert.equal(button.disabled, false, 'Removing one profile must restore the save action');
+  assert.equal(button.textContent, 'Save demo profile');
+  assert.doesNotThrow(() => update(0, false), 'Minimal test DOMs without this button remain supported');
+});
