@@ -1318,7 +1318,7 @@ test('Services picker changes local demo context without suggesting compatibilit
   assert.equal(context.mine.length, 0, 'Preview selection must not create profiles');
 });
 
-test('Discover and Services demo add buttons have distinct accessible names', () => {
+test('Discover concept actions and Services demo add buttons have distinct accessible names', () => {
   const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
   assert.ok(source, 'Expected the shared catalog renderer');
   const actions = {};
@@ -1344,6 +1344,7 @@ test('Discover and Services demo add buttons have distinct accessible names', ()
   new Script('(' + source[0].trim() + ')').runInNewContext(context)();
   assert.match(actions.r1, /type="button"[^>]*aria-label="Add Home Robot Concept to demo cart \(preview only\)"/);
   assert.match(actions.s1, /type="button"[^>]*aria-label="Add Robot Setup service preview to demo cart \(no booking\)"/);
+  assert.match(actions.r1, /type="button" data-robot="r1" aria-label="Create local demo profile for Home Robot Concept \(ownership and compatibility not verified\)"/);
   assert.match(actions.r1, />Add to demo cart<\/button>/);
   assert.match(actions.s1, />Add demo service<\/button>/);
   assert.match(page, /No bookings, service requests or payments are available/);
