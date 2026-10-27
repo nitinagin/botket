@@ -979,7 +979,7 @@ test('Discover concept search combines category filters, normalized terms and ac
     robots: catalog, skills: [], services: [], selectedCategory: 'all',
     byId: id => elements[id],
     card: x => '<article>' + x.name + '</article>',
-    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, renderCart: () => {},
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, updateServicesContext: () => {}, renderCart: () => {},
     document: { querySelectorAll: () => [] }
   };
   const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
@@ -1041,7 +1041,7 @@ test('Discover no-results recovery clears both filters and restores all demo con
   const context = {
     robots: catalog, skills: [], services: [], selectedCategory: 'companion',
     byId: id => elements[id], card: x => '<article>' + x.name + '</article>',
-    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, renderCart: () => {},
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, updateServicesContext: () => {}, renderCart: () => {},
     document: { querySelectorAll: selector => selector === '[data-category]' ? categoryButtons : [] }
   };
   const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
@@ -1103,4 +1103,33 @@ test('demo registration rejects invalid details before changing saved profiles',
   assert.equal(saves, 1);
   assert.equal(ids, 1);
   assert.equal(visits, 1);
+});
+
+test('Services shows selected demo profile without implying verified service compatibility', () => {
+  assert.match(page, /id="serviceRobotContext"[^>]*role="status"[^>]*aria-live="polite"/);
+  const source = app.match(/function updateServicesContext\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected generic service context renderer');
+  const notice = { textContent: '' };
+  const context = {
+    mine: [{ id: 'demo-1', name: 'Study Helper' }],
+    selectedRobotId: 'demo-1',
+    byId: id => id === 'serviceRobotContext' ? notice : undefined
+  };
+  const update = new Script('(' + source[0] + ')').runInNewContext(context);
+  update();
+  assert.match(notice.textContent, /Selected local demo profile: Study Helper/);
+  assert.match(notice.textContent, /not matched to this robot/i);
+  assert.match(notice.textContent, /compatibility are unverified/i);
+  assert.match(notice.textContent, /no booking is available/i);
+
+  context.selectedRobotId = 'deleted-profile';
+  update();
+  assert.match(notice.textContent, /not matched to any robot/i);
+  assert.doesNotMatch(notice.textContent, /Study Helper/);
+
+  context.mine = [];
+  context.selectedRobotId = null;
+  update();
+  assert.match(notice.textContent, /not matched to any robot/i);
+  assert.equal(context.mine.length, 0, 'Services must not create robot profiles');
 });
