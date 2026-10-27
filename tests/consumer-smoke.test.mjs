@@ -1317,3 +1317,34 @@ test('Services picker changes local demo context without suggesting compatibilit
   assert.match(notice.textContent, /compatibility are unverified/);
   assert.equal(context.mine.length, 0, 'Preview selection must not create profiles');
 });
+
+test('Discover and Services demo add buttons have distinct accessible names', () => {
+  const source = app.match(/function render\\(\\)\\{[\\s\\S]*?\\n(?=function show\\()/);
+  assert.ok(source, 'Expected the shared catalog renderer');
+  const actions = {};
+  const elements = {
+    robotSearch: { value: '' },
+    clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true },
+    filterSummary: { textContent: '' },
+    products: { innerHTML: '' },
+    skillcards: { innerHTML: '' },
+    servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: [{ id: 'r1', name: 'Home Robot Concept', category: 'home' }],
+    services: [{ id: 's1', name: 'Robot Setup', detail: 'Illustrative only' }],
+    skills: [], selectedCategory: 'all',
+    byId: id => elements[id],
+    card: (item, action) => { actions[item.id] = action; return '<article></article>'; },
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {},
+    updateServicesContext: () => {}, renderCart: () => {},
+    document: { querySelectorAll: () => [] }
+  };
+  new Script('(' + source[0].trim() + ')').runInNewContext(context)();
+  assert.match(actions.r1, /type="button"[^>]*aria-label="Add Home Robot Concept to demo cart \\(preview only\\)"/);
+  assert.match(actions.s1, /type="button"[^>]*aria-label="Add Robot Setup service preview to demo cart \\(no booking\\)"/);
+  assert.match(actions.r1, />Add to demo cart<\\/button>/);
+  assert.match(actions.s1, />Add demo service<\\/button>/);
+  assert.match(page, /No bookings, service requests or payments are available/);
+});
