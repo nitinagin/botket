@@ -1111,13 +1111,19 @@ test('Services shows selected demo profile without implying verified service com
   assert.ok(source, 'Expected generic service context renderer');
   const notice = { textContent: '' };
   const context = {
-    mine: [{ id: 'demo-1', name: 'Study Helper' }],
+    mine: [{ id: 'demo-1', name: 'Study Helper', brand: 'Example Robotics', model: 'A-1' },
+      { id: 'demo-2', name: 'Study Helper', brand: 'Sample Maker', model: 'B-2' }],
     selectedRobotId: 'demo-1',
     byId: id => id === 'serviceRobotContext' ? notice : undefined
   };
   const update = new Script('(' + source[0] + ')').runInNewContext(context);
   update();
   assert.match(notice.textContent, /Selected local demo profile: Study Helper/);
+  assert.match(notice.textContent, /Example Robotics · A-1/, 'Show model to distinguish matching nicknames');
+  context.selectedRobotId = 'demo-2';
+  update();
+  assert.match(notice.textContent, /Sample Maker · B-2/, 'Service context follows the selected demo profile');
+  assert.doesNotMatch(notice.textContent, /Example Robotics · A-1/);
   assert.match(notice.textContent, /not matched to this robot/i);
   assert.match(notice.textContent, /compatibility are unverified/i);
   assert.match(notice.textContent, /no booking is available/i);
