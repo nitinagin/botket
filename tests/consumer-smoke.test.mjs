@@ -156,7 +156,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
-      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart'].map(id => [id, node()])
+      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart'].map(id => [id, node()])
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
@@ -1351,13 +1351,13 @@ test('Discover and Services demo add buttons have distinct accessible names', ()
 
 test('Discover offers a synchronized demo cart review shortcut without real checkout', () => {
   assert.match(page, /id="reviewDiscoverCart" hidden>Review demo cart/);
-  const handler = app.match(/byId\\('reviewDiscoverCart'\\)\\.onclick=(\\(\\)=>show\\('cart'\\));/);
+  const handler = app.match(/byId\('reviewDiscoverCart'\)\.onclick=(\(\)=>show\('cart'\));/);
   assert.ok(handler, 'Expected Discover-to-Checkout handler');
   let destination;
   new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
   assert.equal(destination, 'cart');
 
-  const source = app.match(/function renderCart\\(\\)\\{[^\\n]*\\}/);
+  const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
   assert.ok(source, 'Expected demo cart renderer');
   const node = () => ({
     children: [], attributes: {}, textContent: '',
