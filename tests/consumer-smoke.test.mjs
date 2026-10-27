@@ -986,7 +986,7 @@ test('Discover concept search combines category filters, normalized terms and ac
     servicecards: { innerHTML: '' }
   };
   const context = {
-    robots: catalog, skills: [], services: [], selectedCategory: 'all',
+    robots: catalog, skills: [], services: [], selectedCategory: 'all', cart: [],
     byId: id => elements[id],
     card: x => '<article>' + x.name + '</article>',
     renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, updateServicesContext: () => {}, renderCart: () => {},
@@ -1049,7 +1049,7 @@ test('Discover no-results recovery clears both filters and restores all demo con
     skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
   };
   const context = {
-    robots: catalog, skills: [], services: [], selectedCategory: 'companion',
+    robots: catalog, skills: [], services: [], selectedCategory: 'companion', cart: [],
     byId: id => elements[id], card: x => '<article>' + x.name + '</article>',
     renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, updateServicesContext: () => {}, renderCart: () => {},
     document: { querySelectorAll: selector => selector === '[data-category]' ? categoryButtons : [] }
@@ -1334,7 +1334,7 @@ test('Discover and Services demo add buttons have distinct accessible names', ()
   const context = {
     robots: [{ id: 'r1', name: 'Home Robot Concept', category: 'home' }],
     services: [{ id: 's1', name: 'Robot Setup', detail: 'Illustrative only' }],
-    skills: [], selectedCategory: 'all',
+    skills: [], selectedCategory: 'all', cart: [],
     byId: id => elements[id],
     card: (item, action) => { actions[item.id] = action; return '<article></article>'; },
     renderMyRobots: () => {}, updateSkillsRobotSummary: () => {},
@@ -1395,4 +1395,50 @@ test('Discover offers a synchronized demo cart review shortcut without real chec
   render();
   assert.equal(elements.reviewDiscoverCart.hidden, true);
   assert.match(page, /No products are available to order through this demo/i);
+});
+
+test('Discover and Services mark already-added demo items without duplicating checkout actions', () => {
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
+  assert.ok(source, 'Expected the shared demo catalog renderer');
+  const actions = {};
+  const elements = {
+    robotSearch: { value: '' }, clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true }, filterSummary: { textContent: '' },
+    products: { innerHTML: '' }, skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
+  };
+  const robot = { id: 'r1', name: 'Home Robot Concept', category: 'home' };
+  const otherRobot = { id: 'r2', name: 'Companion Robot Concept', category: 'companion' };
+  const service = { id: 's1', name: 'Robot Setup', detail: 'Illustrative only' };
+  const cart = [];
+  const context = {
+    robots: [robot, otherRobot], services: [service], skills: [], cart,
+    selectedCategory: 'all', byId: id => elements[id],
+    card: (item, action) => { actions[item.id] = action; return '<article></article>'; },
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {},
+    updateServicesContext: () => {}, renderCart: () => {},
+    document: { querySelectorAll: () => [] }
+  };
+  const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
+  render();
+  assert.match(actions.r1, /aria-label="Add Home Robot Concept to demo cart \(preview only\)"/);
+  assert.match(actions.s1, /aria-label="Add Robot Setup service preview to demo cart \(no booking\)"/);
+  assert.doesNotMatch(actions.r1, / disabled /);
+
+  cart.push(robot, service);
+  render();
+  for (const id of ['r1', 's1']) {
+    assert.match(actions[id], / disabled aria-disabled="true"/, 'Added items must not be addable twice');
+    assert.match(actions[id], />In demo cart<\/button>/);
+    assert.match(actions[id], /already in demo cart/);
+  }
+  assert.doesNotMatch(actions.r2, / disabled /, 'Unselected robot remains addable');
+  assert.match(actions.r2, />Add to demo cart<\/button>/);
+
+  cart.splice(0);
+  render();
+  assert.doesNotMatch(actions.r1, / disabled /, 'Removed robot can be added again');
+  assert.doesNotMatch(actions.s1, / disabled /, 'Removed service can be added again');
+  assert.match(actions.r1, />Add to demo cart<\/button>/);
+  assert.match(actions.s1, />Add demo service<\/button>/);
+  assert.match(page, /No payment, reservation or order submission occurs/);
 });
