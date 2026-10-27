@@ -1534,3 +1534,36 @@ test('Skills offers a synchronized demo cart review shortcut without real checko
   assert.match(page, /Compatibility is not verified, and installation is unavailable/);
   assert.match(page, /No payment, reservation or order submission occurs/);
 });
+
+test('Skills disabled install buttons identify each preview without claiming compatibility', () => {
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
+  assert.ok(source, 'Expected shared demo catalog renderer');
+  const skills = [
+    { name: 'Home Patrol', price: 199, detail: 'Example only' },
+    { name: 'Object Delivery', price: 299, detail: 'Example only' }
+  ];
+  const actions = [];
+  const elements = {
+    robotSearch: { value: '' }, clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true }, filterSummary: { textContent: '' },
+    products: { innerHTML: '' }, skillcards: { innerHTML: '' },
+    servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: [], services: [], skills, selectedCategory: 'all', cart: [],
+    byId: id => elements[id],
+    card: (item, action) => { if (skills.includes(item)) actions.push(action); return '<article></article>'; },
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {},
+    updateServicesContext: () => {}, renderCart: () => {},
+    document: { querySelectorAll: () => [] }
+  };
+  new Script('(' + source[0].trim() + ')').runInNewContext(context)();
+  assert.equal(actions.length, 2);
+  assert.match(actions[0], /disabled aria-disabled="true" aria-label="Install unavailable for Home Patrol \(preview only; compatibility not verified\)"/);
+  assert.match(actions[1], /disabled aria-disabled="true" aria-label="Install unavailable for Object Delivery \(preview only; compatibility not verified\)"/);
+  for (const action of actions) {
+    assert.match(action, />Install unavailable<\/button>/);
+    assert.doesNotMatch(action, /data-install|onclick=/);
+  }
+  assert.match(page, /Compatibility is not verified, and installation is unavailable/);
+});
