@@ -156,7 +156,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
-      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart', 'reviewRobotsCart'].map(id => [id, node()])
+      'preview', 'checkoutToRobots', 'name', 'result', 'reviewServicesCart', 'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart'].map(id => [id, node()])
   );
   const robot = { id: 'r1', name: 'Robot Concept', price: 34900 };
   const service = { id: 's1', name: 'Service Preview', price: 1500 };
@@ -1367,7 +1367,7 @@ test('Discover offers a synchronized demo cart review shortcut without real chec
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
-      'reviewDiscoverCart', 'reviewRobotsCart', 'clearCart', 'browseFromCheckout',
+      'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart', 'clearCart', 'browseFromCheckout',
       'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
   );
   elements.checkoutToRobots.hidden = true;
@@ -1461,7 +1461,7 @@ test('My Robots offers a synchronized demo cart review shortcut without real che
   });
   const elements = Object.fromEntries(
     ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
-      'reviewDiscoverCart', 'reviewRobotsCart', 'clearCart', 'browseFromCheckout',
+      'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart', 'clearCart', 'browseFromCheckout',
       'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
   );
   elements.checkoutToRobots.hidden = true;
@@ -1484,5 +1484,53 @@ test('My Robots offers a synchronized demo cart review shortcut without real che
   context.cart = [];
   render();
   assert.equal(elements.reviewRobotsCart.hidden, true, 'Removing items hides the shortcut');
+  assert.match(page, /No payment, reservation or order submission occurs/);
+});
+
+test('Skills offers a synchronized demo cart review shortcut without real checkout', () => {
+  assert.match(page, /id="reviewSkillsCart" hidden>Review demo cart/);
+  const handler = app.match(/byId\('reviewSkillsCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.ok(handler, 'Expected Skills-to-Checkout handler');
+  let destination;
+  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  assert.equal(destination, 'cart');
+
+  const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected demo cart renderer');
+  const node = () => ({
+    children: [], textContent: '', hidden: false,
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute() {}
+  });
+  const elements = Object.fromEntries(
+    ['items', 'cartSummary', 'total', 'count', 'reviewServicesCart',
+      'reviewDiscoverCart', 'reviewRobotsCart', 'reviewSkillsCart', 'clearCart',
+      'browseFromCheckout', 'preview', 'checkoutToRobots', 'result'].map(id => [id, node()])
+  );
+  elements.checkoutToRobots.hidden = true;
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const service = { id: 's1', name: 'Robot Setup', price: 1500 };
+  const context = {
+    cart: [], robots: [robot], services: [service], lastBrowseTab: 'store',
+    byId: id => elements[id], document: { createElement: node },
+    money: value => '฿' + value.toLocaleString('en-US'),
+    show: () => {}
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+  render();
+  assert.equal(elements.reviewSkillsCart.hidden, true, 'Empty cart hides the shortcut');
+  context.cart = [robot];
+  render();
+  assert.equal(elements.reviewSkillsCart.hidden, false);
+  assert.equal(elements.reviewSkillsCart.textContent, 'Review demo cart (1 item) →');
+  assert.equal(elements.reviewSkillsCart.textContent, elements.reviewRobotsCart.textContent);
+  context.cart = [robot, service];
+  render();
+  assert.equal(elements.reviewSkillsCart.textContent, 'Review demo cart (2 items) →');
+  context.cart = [];
+  render();
+  assert.equal(elements.reviewSkillsCart.hidden, true, 'Removing items hides the shortcut');
+  assert.match(page, /Compatibility is not verified, and installation is unavailable/);
   assert.match(page, /No payment, reservation or order submission occurs/);
 });
