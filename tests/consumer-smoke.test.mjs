@@ -2214,3 +2214,19 @@ test('Services shows recovery routes before generic cards and names them without
   assert.match(noticeElement.textContent, /eligibility and compatibility are unverified/);
   assert.match(noticeElement.textContent, /no booking is available/);
 });
+
+test('mobile Services keeps both recovery actions readable before the preview list', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.ok(mobile.includes('body:has(#services:not([hidden])) header { padding: 8px 16px; }'));
+  assert.ok(mobile.includes('main:has(#services:not([hidden])) { padding-top: 8px; }'));
+  assert.ok(mobile.includes('main:has(#services:not([hidden])) > h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; }'));
+  assert.ok(mobile.includes('#services > p:has(.next-step) { display: grid; gap: 8px; margin: 6px 0; }'));
+  assert.ok(mobile.includes('#services .next-step { width: 100%; }'));
+  assert.ok(mobile.includes('#services > .grid { margin-top: 8px; }'));
+  const services = page.match(/<section id="services"[\\s\\S]*?<\\/section>/)?.[0];
+  assert.ok(services, 'Expected Services section');
+  assert.ok(services.indexOf('id="openSkillsFromServices"') < services.indexOf('id="servicecards"'));
+  assert.ok(services.indexOf('id="openRobotsFromServices"') < services.indexOf('id="servicecards"'));
+  assert.match(services, /No bookings, service requests or payments are available/);
+  assert.match(services, /Generic service previews/);
+});
