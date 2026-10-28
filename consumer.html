@@ -12,6 +12,11 @@
   /* Keep the footer and its Academy link above the fixed mobile navigation. */
   body { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   main { padding: 20px 16px 116px; }
+  /* Keep focused controls above the fixed bottom navigation when scrolled into view. */
+  html { scroll-padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
+  section input:focus, section select:focus, section button:focus {
+    scroll-margin-bottom: calc(116px + env(safe-area-inset-bottom));
+  }
   .tabs {
     position: fixed;
     top: auto;

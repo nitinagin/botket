@@ -30,6 +30,13 @@ test('static HTML element IDs are unique', () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test('mobile focus targets clear the fixed bottom navigation', () => {
+  assert.match(page, /@media \\(max-width: 640px\\)/);
+  assert.match(page, /html \\{ scroll-padding-bottom: calc\\(116px \\+ env\\(safe-area-inset-bottom\\)\\); \\}/);
+  assert.match(page, /section input:focus, section select:focus, section button:focus \\{/);
+  assert.match(page, /scroll-margin-bottom: calc\\(116px \\+ env\\(safe-area-inset-bottom\\)\\)/);
+});
+
 test('checkout and skills clearly remain demos', () => {
   assert.match(page, /This is an order preview, not a real checkout/i);
   assert.match(page, /No payment, reservation or order submission occurs/i);
