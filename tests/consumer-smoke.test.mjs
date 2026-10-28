@@ -1887,3 +1887,31 @@ test('Escape keeps IME composition intact in Discover, My Robots and Checkout', 
     assert.equal(rendered + cleared, 1, id + ' must trigger exactly one clear action');
   }
 });
+
+test('leaving with an unsaved My Robots draft requests a browser warning without affecting empty forms', () => {
+  assert.match(page, /Unsaved fields are not stored\. Reloading or leaving may discard them/);
+  const detector = app.match(/function hasUnsavedRobotDraft\(\)\{[^\n]*\}/);
+  const listener = app.match(/window\.addEventListener\('beforeunload',(e=>\{[^\n]*\})\);/);
+  assert.ok(detector && listener, 'Expected a shared draft detector and beforeunload handler');
+  const fields = Object.fromEntries(['robotNickname', 'robotBrand', 'robotModel'].map(id => [id, { value: '' }]));
+  const hasUnsavedRobotDraft = new Script('(' + detector[0] + ')').runInNewContext({
+    byId: id => fields[id]
+  });
+  const onBeforeUnload = new Script('(' + listener[1] + ')').runInNewContext({ hasUnsavedRobotDraft });
+  const dispatch = () => {
+    let prevented = 0;
+    const event = { returnValue: undefined, preventDefault() { prevented++; } };
+    onBeforeUnload(event);
+    return { prevented, returnValue: event.returnValue };
+  };
+  assert.deepEqual(dispatch(), { prevented: 0, returnValue: undefined }, 'Empty form must not warn');
+  fields.robotNickname.value = '   ';
+  assert.deepEqual(dispatch(), { prevented: 0, returnValue: undefined }, 'Whitespace-only form must not warn');
+  fields.robotNickname.value = 'My study robot';
+  assert.deepEqual(dispatch(), { prevented: 1, returnValue: '' }, 'Unsaved nickname should request a warning');
+  fields.robotNickname.value = '';
+  fields.robotModel.value = 'Model A';
+  assert.deepEqual(dispatch(), { prevented: 1, returnValue: '' }, 'Any unsaved field should request a warning');
+  fields.robotModel.value = '';
+  assert.deepEqual(dispatch(), { prevented: 0, returnValue: undefined }, 'Discarding or saving cleared fields must not warn');
+});
