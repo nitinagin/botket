@@ -30,6 +30,14 @@ test('static HTML element IDs are unique', () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+
+test('keyboard users can skip directly to the consumer workflow', () => {
+  assert.match(page, /<body>\s*<a class="skip-link" href="#main-content">Skip to consumer platform<\/a>\s*<header>/);
+  assert.match(page, /<main id="main-content" tabindex="-1">/);
+  assert.match(page, /\.skip-link\{[^}]*position:absolute;[^}]*top:-80px;[^}]*z-index:200/);
+  assert.match(page, /\.skip-link:focus-visible\{top:12px\}/);
+});
+
 test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /@media \(max-width: 640px\)/);
   assert.match(page, /html \{ scroll-padding-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\); \}/);
