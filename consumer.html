@@ -1,7 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BOTKET Consumer Demo</title>
-<style>body{font:16px system-ui;margin:0;background:#f4f8f5;color:#193321}header{background:white;padding:20px;border-bottom:1px solid #ddd}main{max-width:900px;margin:auto;padding:25px}h1{font-size:38px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button,button{padding:12px;border:0;border-radius:10px;cursor:pointer}.tabs button{background:#e4efe7}.tabs button.active,.buy{background:#087d3c;color:white}.store-filters{margin:14px 0;display:flex;gap:8px;flex-wrap:wrap}.store-filters button{background:#e4efe7}.store-filters button[aria-pressed="true"]{background:#087d3c;color:white}.category{font-size:13px;color:#496653;font-weight:650}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0}.card{background:white;border-radius:15px;padding:20px;border:1px solid #dae8df}.muted{color:#68786d}section[hidden]{display:none}input,select{padding:10px;border:1px solid #ccc;border-radius:8px;max-width:100%}label{display:block;margin:10px 0}.card button{margin-top:6px}.hint{font-size:13px;color:#6b7d70}.status{font-size:13px;color:#80601c;background:#fff3d8;padding:6px 9px;border-radius:8px;display:inline-block}.academy-steps{padding-left:22px;line-height:1.9}.academy-steps li{padding-left:5px}.academy-note{background:#edf7ef;border-left:4px solid #087d3c;padding:12px 15px;border-radius:8px}.cart-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #e1e9e3;padding:10px 0;flex-wrap:wrap}.cart-row button{background:#f2e8e8;color:#6b2626;min-height:44px;flex-shrink:0}.cart-row span{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}.cart-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.cart-actions button{background:#e4efe7;color:#193321;min-height:44px}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #1b874e;outline-offset:2px}body{background:#fffdf5;color:#111}.card{border:3px solid #111;box-shadow:5px 5px #111;border-radius:8px}h1,h2,h3{font-weight:900}.tabs button.active,.buy{background:#10b847;color:#111}.tabs button{border:2px solid #111;box-shadow:3px 3px #111}.store-filters button[aria-pressed=true]{background:#ffdb23;color:#111}
+<style>body{font:16px system-ui;margin:0;background:#f4f8f5;color:#193321}header{background:white;padding:20px;border-bottom:1px solid #ddd}main{max-width:900px;margin:auto;padding:25px}h1{font-size:38px}.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button,button{padding:12px;border:0;border-radius:10px;cursor:pointer}.tabs button{background:#e4efe7}.tabs button.active,.buy{background:#087d3c;color:white}.store-filters{margin:14px 0;display:flex;gap:8px;flex-wrap:wrap}.store-filters button{background:#e4efe7}.store-filters button[aria-pressed="true"]{background:#087d3c;color:white}.category{font-size:13px;color:#496653;font-weight:650}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0}.card{background:white;border-radius:15px;padding:20px;border:1px solid #dae8df}.muted{color:#68786d}section[hidden]{display:none}input,select{padding:10px;border:1px solid #ccc;border-radius:8px;max-width:100%}label{display:block;margin:10px 0}.card button{margin-top:6px}.hint{font-size:13px;color:#6b7d70}.status{font-size:13px;color:#80601c;background:#fff3d8;padding:6px 9px;border-radius:8px;display:inline-block}.academy-steps{padding-left:22px;line-height:1.9}.academy-steps li{padding-left:5px}.academy-note{background:#edf7ef;border-left:4px solid #087d3c;padding:12px 15px;border-radius:8px}.cart-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #e1e9e3;padding:10px 0;flex-wrap:wrap}.cart-row button{background:#f2e8e8;color:#6b2626;min-height:44px;flex-shrink:0}.cart-row span{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}.cart-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.cart-actions button{background:#e4efe7;color:#193321;min-height:44px}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #1b874e;outline-offset:2px}body{background:#fffdf5;color:#111}.card{border:3px solid #111;box-shadow:5px 5px #111;border-radius:8px}h1,h2,h3{font-weight:900}.tabs button.active,.buy{background:#10b847;color:#111}.tabs button{border:2px solid #111;box-shadow:3px 3px #111;position:relative}.store-filters button[aria-pressed=true]{background:#ffdb23;color:#111}
+.tabs button.active::after,.tabs button[aria-current=page]::after{content:"";position:absolute;top:4px;left:8px;right:8px;height:4px;border-radius:2px;background:#111;pointer-events:none}
+.tabs button:focus-visible{outline:3px solid #111;outline-offset:2px}
+@media (forced-colors: active){.tabs button[aria-current=page]::after{background:Highlight}}
 .concept-card{display:flex;flex-direction:column;gap:10px;background:#fff}
 .concept-card .concept-price{align-self:flex-start;margin:0;padding:9px 12px;border:2px solid #111;background:#ffdb23;font-size:1.2rem;font-weight:900}
 .concept-card .concept-label{margin:0;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
@@ -26,20 +29,42 @@
     z-index: 100;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 5px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    gap: 6px;
+    padding: 8px max(6px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     background: #fffdf5;
     border-top: 3px solid #111;
   }
   .tabs button {
+    box-sizing: border-box;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    width: 100%;
     min-width: 0;
     min-height: 48px;
-    padding: 8px 2px;
+    padding: 10px 0 6px;
     border-radius: 6px;
     box-shadow: none;
-    font-size: clamp(10px, 2.6vw, 13px);
-    line-height: 1.2;
-    overflow-wrap: anywhere;
+    font-weight: 700;
+    line-height: 1.1;
+    hyphens: none;
+  }
+  .tabs button .nav-label,
+  .tabs button .nav-count {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-align: center;
+    font-size: 10px;
+    font-size: clamp(10px, 18cqi, 13px);
+  }
+  .tabs button:focus-visible {
+    outline: 3px solid #111;
+    outline-offset: 1px;
   }
   .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 }
@@ -52,7 +77,7 @@
 <a class="skip-link" href="#main-content">Skip to consumer platform</a>
 <header><img src="assets/botket-logo.svg" alt="BOTKET" style="display:block;width:150px;max-width:100%;height:auto" /> · Personal Robotics Platform</header>
 <main id="main-content" tabindex="-1"><h1>Discover. Preview. Explore.</h1><p>Explore robot concepts, skill previews and service previews in one place.</p><p class="muted">Prototype only: sample listings and prices. Checkout creates an order preview only; no purchases, payments, verified compatibility or device connections.</p>
-<nav class="tabs" aria-label="Platform sections"><button type="button" class="active" data-tab="store" aria-controls="store" aria-current="page">Discover</button><button type="button" data-tab="cart" aria-controls="cart">Checkout (<span id="count">0</span>)</button><button type="button" data-tab="robots" aria-controls="robots">My Robots</button><button type="button" data-tab="skills" aria-controls="skills">Skills</button><button type="button" data-tab="services" aria-controls="services">Services</button></nav>
+<nav class="tabs" aria-label="Platform sections"><button type="button" class="active" data-tab="store" aria-controls="store" aria-current="page"><span class="nav-label">Discover</span></button><button type="button" data-tab="cart" aria-controls="cart"><span class="nav-label">Checkout</span> <span class="nav-count">(<span id="count">0</span>)</span></button><button type="button" data-tab="robots" aria-controls="robots"><span class="nav-label">My Robots</span></button><button type="button" data-tab="skills" aria-controls="skills"><span class="nav-label">Skills</span></button><button type="button" data-tab="services" aria-controls="services"><span class="nav-label">Services</span></button></nav>
 <section id="store"><h2>Explore robots</h2><p class="muted">Illustrative concepts only. No products are available to order through this demo.</p><div class="store-filters" role="group" aria-label="Robot category filters"><button type="button" data-category="all" aria-pressed="true">All robots</button><button type="button" data-category="home" aria-pressed="false">Home</button><button type="button" data-category="companion" aria-pressed="false">Companion</button><button type="button" data-category="education" aria-pressed="false">Education</button></div><label for="robotSearch">Find robot concepts <input id="robotSearch" type="search" maxlength="80" placeholder="Search concept or category" autocomplete="off" aria-describedby="filterSummary" aria-controls="products"></label><button type="button" id="clearRobotSearch" hidden aria-label="Clear robot concept search">Clear search</button><p id="filterSummary" class="hint" role="status" aria-live="polite"></p><button type="button" id="resetDiscoverFilters" hidden>Show all robot concepts</button><div class="grid" id="products" aria-label="Robot concept search results"></div><p><button type="button" id="reviewDiscoverCart" hidden>Review demo cart →</button></p></section>
 
 <section id="robots" hidden><h2>My Robots</h2><p class="muted">Register a local demo profile for any robot, including one purchased elsewhere. This does not verify ownership or connect hardware.</p><form id="registerRobot" class="card"><h3>Add a demo robot profile</h3><label>Robot nickname <input id="robotNickname" required maxlength="40" placeholder="e.g. My study robot"></label><label>Brand or manufacturer <input id="robotBrand" required maxlength="40" placeholder="e.g. Example Robotics"></label><label>Model <input id="robotModel" required maxlength="60" placeholder="e.g. Model A"></label><button class="buy" id="saveDemoProfile" type="submit" aria-describedby="profileCount">Save demo profile</button> <button id="clearRobotDraft" type="button" hidden>Discard unsaved fields</button><p id="robotDraftStatus" class="hint" role="status" aria-live="polite"></p><p class="hint">Unsaved fields are not stored. Reloading or leaving may discard them; your browser may warn before you leave.</p><p class="hint">Saved only in this browser. No serial numbers, warranty, ownership or compatibility verification.</p><p id="robotMessage" role="status"></p></form><h3>Saved demo profiles</h3><p id="profileCount" class="hint" role="status" aria-live="polite"></p><label for="profileSearch">Find a demo profile <input id="profileSearch" type="search" maxlength="80" placeholder="Search nickname, brand or model" autocomplete="off" aria-describedby="profileSearchSummary" aria-controls="myrobots"></label><button type="button" id="clearProfileSearch" hidden aria-label="Clear demo profile search">Clear search</button><p id="profileSearchSummary" class="hint" role="status" aria-live="polite"></p><p><button type="button" id="clearProfiles" hidden>Clear all demo profiles</button></p><div id="myrobots" class="grid" aria-label="Saved demo robot profiles"></div><p><button type="button" class="buy" id="openSkillsFromRobots">Explore skill previews →</button></p><p><button type="button" id="reviewRobotsCart" hidden>Review demo cart →</button></p></section>

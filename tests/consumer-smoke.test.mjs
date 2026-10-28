@@ -45,6 +45,32 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /scroll-margin-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\)/);
 });
 
+test('mobile bottom navigation keeps whole labels, a non-color current section and safe-area insets', () => {
+  const nav = page.match(/<nav class="tabs"[\s\S]*?<\/nav>/)?.[0];
+  assert.ok(nav, 'Expected the platform section navigation');
+  for (const label of ['Discover', 'Checkout', 'My Robots', 'Skills', 'Services']) {
+    assert.match(nav, new RegExp(`<span class="nav-label">${label}</span>`));
+  }
+  assert.match(nav, /<button\b[^>]*\bdata-tab="cart"[^>]*>[\s\S]*<span class="nav-count">\(<span id="count">0<\/span>\)<\/span>/);
+  assert.match(nav, /data-tab="store"[^>]*aria-current="page"/);
+  assert.match(page, /\.tabs button\.active::after,\.tabs button\[aria-current=page\]::after\{content:"";position:absolute;top:4px;left:8px;right:8px;height:4px;border-radius:2px;background:#111;pointer-events:none\}/);
+  assert.match(page, /\.tabs button:focus-visible\{outline:3px solid #111;outline-offset:2px\}/);
+  assert.match(page, /@media \(forced-colors: active\)\{\.tabs button\[aria-current=page\]::after\{background:Highlight\}\}/);
+
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /padding: 8px max\(6px, env\(safe-area-inset-right\)\) calc\(8px \+ env\(safe-area-inset-bottom\)\) max\(6px, env\(safe-area-inset-left\)\)/);
+  assert.match(mobile, /min-height: 48px/);
+  assert.match(mobile, /box-sizing: border-box/);
+  assert.match(mobile, /container-type: inline-size/);
+  assert.match(mobile, /overflow-wrap: normal/);
+  assert.match(mobile, /word-break: normal/);
+  assert.match(mobile, /hyphens: none/);
+  assert.match(mobile, /font-size: 10px;\s*font-size: clamp\(10px, 18cqi, 13px\)/);
+  assert.match(mobile, /\.tabs button:focus-visible \{\s*outline: 3px solid #111;\s*outline-offset: 1px;\s*\}/);
+  assert.doesNotMatch(mobile, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(mobile, /transition:|animation:/);
+});
+
 test('Discover results expose list semantics only for matching robot concepts', () => {
   assert.match(page, /id="products" aria-label="Robot concept search results"/);
   const renderSource = app.match(/function render\(\)\{[^\n]*/)?.[0];
