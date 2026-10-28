@@ -68,6 +68,23 @@
   }
   .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
   .buy.next-step { width: 100%; }
+  /* At 390px the first concept card sat under the fixed bottom nav. Keep its name, illustrative price, and demo actions on screen. */
+  body:has(#store:not([hidden])) header { padding: 8px 16px; }
+  main:has(#store:not([hidden])) { padding-top: 8px; }
+  main:has(#store:not([hidden])) > h1 {
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 0 0 8px;
+  }
+  main:has(#store:not([hidden])) > p { margin: 0 0 8px; }
+  #store > h2 { margin: 8px 0 4px; }
+  #store > p.muted { margin: 0 0 6px; }
+  #store .store-filters { margin: 0 0 6px; }
+  #store > label { margin: 0 0 4px; }
+  #store #filterSummary { margin: 2px 0 4px; }
+  #store > .grid { margin-top: 4px; }
+  .concept-card { gap: 8px; padding: 12px 14px; }
+  .concept-card h3 { margin: 0; }
 }
 
 /* Keyboard-first entry point, above the fixed mobile navigation. */
