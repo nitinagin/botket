@@ -669,6 +669,7 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
   assert.equal(renders, 4, 'Each navigation rerenders the active demo state');
 
   for (const [id, expected] of [
+    ['openDiscoverFromRobots', 'store'],
     ['openSkillsFromRobots', 'skills'],
     ['openRobotsFromSkills', 'robots'],
     ['openServicesFromSkills', 'services'],
@@ -2110,7 +2111,10 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   const robotsList = robots.indexOf('id="myrobots"');
   assert.ok(robotsButton > 0 && robotsButton < robotsForm && robotsForm < robotsList,
     'Explore skill previews stays above the registration form and saved-profile list');
-  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.ok(robots.indexOf('id="openDiscoverFromRobots"') < robotsButton,
+    'The empty-state route back to Discover stays with the labelled next step');
+  assert.equal(robots.match(/id="openDiscoverFromRobots"/g).length, 1);
   assert.equal(robots.match(/id="openSkillsFromRobots"/g).length, 1);
 
   const skillsButton = skills.indexOf('id="openServicesFromSkills"');
@@ -2213,6 +2217,64 @@ test('Services shows recovery routes before generic cards and names them without
   assert.match(noticeElement.textContent, /Explore generic skill previews/);
   assert.match(noticeElement.textContent, /eligibility and compatibility are unverified/);
   assert.match(noticeElement.textContent, /no booking is available/);
+});
+
+test('empty My Robots keeps a 44px route back to Discover above the registration form', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  const discover = robots.indexOf('id="openDiscoverFromRobots"');
+  const skills = robots.indexOf('id="openSkillsFromRobots"');
+  const form = robots.indexOf('<form id="registerRobot"');
+  const list = robots.indexOf('id="myrobots"');
+  assert.ok(discover > 0 && discover < skills && skills < form && form < list,
+    'Explore robot concepts stays above skill previews, the form, and the saved-profile list');
+  assert.match(robots, /class="next-step" id="openDiscoverFromRobots">Explore robot concepts →/);
+  assert.match(robots, /does not verify ownership or connect hardware/);
+  assert.equal(robots.match(/id="openDiscoverFromRobots"/g).length, 1);
+  assert.match(page, /byId\('openDiscoverFromRobots'\)\.onclick=\(\)=>show\('store'\)/);
+  assert.match(page, /\.next-step\{[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /\.next-step\[hidden\]\{display:none\}/);
+  assert.match(app, /const discoverRoute=byId\('openDiscoverFromRobots'\);if\(discoverRoute\)discoverRoute\.hidden=mine\.length>0;/);
+
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /#robots > p:has\(\.next-step\) \{ display: grid; gap: 8px; margin: 8px 0; \}/);
+  assert.match(mobile, /#robots > p:has\(\.next-step\) \.next-step \{ width: 100%; \}/);
+
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected My Robots renderer');
+  const node = () => ({
+    children: [], attributes: {}, className: '', hidden: false, disabled: false, textContent: '',
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; }
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'saveDemoProfile', 'profileCount', 'clearProfiles', 'profileSearch',
+      'clearProfileSearch', 'profileSearchSummary', 'openDiscoverFromRobots'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const visits = [];
+  const context = {
+    mine: [],
+    selectedRobotId: null,
+    byId: id => elements[id],
+    document: { createElement: node },
+    show: tab => visits.push(tab)
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+  render();
+  assert.equal(elements.openDiscoverFromRobots.hidden, false, 'No saved profiles keeps Discover visible');
+  assert.equal(elements.myrobots.children[2].textContent, 'Explore robot concepts →');
+  elements.myrobots.children[2].onclick();
+  assert.deepEqual(visits, ['store'], 'The list recovery still opens Discover');
+
+  context.mine = [{ id: 'demo-1', name: 'Study Helper', brand: 'Example', model: 'A' }];
+  render();
+  assert.equal(elements.openDiscoverFromRobots.hidden, true, 'Saved profiles keep the existing skills-first route');
+  assert.equal(elements.myrobots.children[0].children[0].textContent, 'Study Helper');
+  context.mine = [];
+  render();
+  assert.equal(elements.openDiscoverFromRobots.hidden, false, 'Clearing the last profile shows Discover again');
 });
 
 test('mobile Services keeps both recovery actions readable before the preview list', () => {
