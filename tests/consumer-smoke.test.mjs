@@ -45,6 +45,20 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /scroll-margin-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\)/);
 });
 
+test('Discover results expose list semantics only for matching robot concepts', () => {
+  assert.match(page, /id="products" aria-label="Robot concept search results"/);
+  const renderSource = app.match(/function render\(\)\{[^\n]*/)?.[0];
+  assert.ok(renderSource, 'Expected Discover renderer');
+  assert.match(renderSource, /byId\('products'\)\.setAttribute\('role',visibleRobots\.length\?'list':'group'\)/);
+  const cardSource = app.match(/function card\(x,action,variant=''\)\{[^\n]*\}/)?.[0];
+  assert.ok(cardSource, 'Expected shared preview card renderer');
+  const renderCard = new Script('(' + cardSource + ')').runInNewContext({ money: n => '฿' + n });
+  const concept = renderCard({ name: 'Home Robot Concept', price: 1 }, '', 'concept-card');
+  const generic = renderCard({ name: 'Robot Setup', price: 1 }, '');
+  assert.match(concept, /^<article role="listitem" class="card concept-card">/);
+  assert.doesNotMatch(generic, /role="listitem"/, 'Service cards should keep their existing semantics');
+});
+
 test('demo checkout cart exposes list semantics only when populated', () => {
   assert.match(page, /id="items" aria-label="Demo cart items" aria-live="polite"/);
   assert.match(app, /root\.setAttribute\('role',cart\.length\?'list':'group'\)/);
@@ -1104,7 +1118,7 @@ test('Discover concept search combines category filters, normalized terms and ac
     clearRobotSearch: { hidden: true },
     resetDiscoverFilters: { hidden: true },
     filterSummary: { textContent: '' },
-    products: { innerHTML: '' },
+    products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } },
     skillcards: { innerHTML: '' },
     servicecards: { innerHTML: '' }
   };
@@ -1120,6 +1134,7 @@ test('Discover concept search combines category filters, normalized terms and ac
   const onKey = new Script('(' + escapeSource[1] + ')').runInNewContext({ byId: context.byId, render });
   render();
   assert.match(elements.products.innerHTML, /Home Robot Concept/);
+  assert.equal(elements.products.role, 'list', 'Matching results form a screen-reader list');
   assert.doesNotMatch(elements.products.innerHTML, /Companion Robot Concept/);
   assert.match(elements.filterSummary.textContent, /Showing 1 of 3/);
   assert.equal(elements.clearRobotSearch.hidden, false);
@@ -1127,6 +1142,7 @@ test('Discover concept search combines category filters, normalized terms and ac
   context.selectedCategory = 'education';
   render();
   assert.match(elements.products.innerHTML, /No robot concepts match/);
+  assert.equal(elements.products.role, 'group', 'Empty results are not announced as a list');
   assert.match(elements.filterSummary.textContent, /Showing 0 of 3 robot concepts in education/);
 
   elements.robotSearch.value = '  educational   KIT ';
@@ -1149,6 +1165,7 @@ test('Discover concept search combines category filters, normalized terms and ac
   assert.equal(elements.robotSearch.value, '');
   assert.equal(prevented, 1);
   assert.match(elements.filterSummary.textContent, /Showing 3 of 3 robot concepts/);
+  assert.equal(elements.products.role, 'list', 'Clearing filters restores list semantics');
   assert.equal(catalog.length, 3, 'Filtering never modifies the concept catalog');
 });
 
@@ -1168,7 +1185,7 @@ test('Discover no-results recovery clears both filters and restores all demo con
   const elements = {
     robotSearch: { value: 'home', focused: false, focus() { this.focused = true; } },
     clearRobotSearch: { hidden: true }, resetDiscoverFilters: { hidden: true },
-    filterSummary: { textContent: '' }, products: { innerHTML: '' },
+    filterSummary: { textContent: '' }, products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } },
     skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
   };
   const context = {
@@ -1450,7 +1467,7 @@ test('Discover concept actions and Services demo add buttons have distinct acces
     clearRobotSearch: { hidden: true },
     resetDiscoverFilters: { hidden: true },
     filterSummary: { textContent: '' },
-    products: { innerHTML: '' },
+    products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } },
     skillcards: { innerHTML: '' },
     servicecards: { innerHTML: '' }
   };
@@ -1528,7 +1545,7 @@ test('Discover and Services mark already-added demo items without duplicating ch
   const elements = {
     robotSearch: { value: '' }, clearRobotSearch: { hidden: true },
     resetDiscoverFilters: { hidden: true }, filterSummary: { textContent: '' },
-    products: { innerHTML: '' }, skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
+    products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } }, skillcards: { innerHTML: '' }, servicecards: { innerHTML: '' }
   };
   const robot = { id: 'r1', name: 'Home Robot Concept', category: 'home' };
   const otherRobot = { id: 'r2', name: 'Companion Robot Concept', category: 'companion' };
@@ -1670,7 +1687,7 @@ test('Skills disabled install buttons identify each preview without claiming com
   const elements = {
     robotSearch: { value: '' }, clearRobotSearch: { hidden: true },
     resetDiscoverFilters: { hidden: true }, filterSummary: { textContent: '' },
-    products: { innerHTML: '' }, skillcards: { innerHTML: '' },
+    products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } }, skillcards: { innerHTML: '' },
     servicecards: { innerHTML: '' }
   };
   const context = {
