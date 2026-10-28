@@ -217,8 +217,12 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.equal(elements.reviewServicesCart.textContent, 'Review demo cart (2 items) →');
   assert.equal(elements.checkoutToRobots.hidden, true);
 
+  // A changed cart invalidates an existing preview and announces the removed item.
+  elements.checkoutToRobots.hidden = false;
   elements.items.children[0].children[1].onclick();
   assert.deepEqual(context.cart.map(item => item.id), ['s1']);
+  assert.equal(elements.checkoutToRobots.hidden, true);
+  assert.match(elements.result.textContent, /Removed robot concept "Robot Concept" from demo cart\. 1 demo item remaining\. Preview again to continue\. No order was placed\./);
   assert.equal(elements.total.textContent, 'Total: ฿1,500');
   assert.equal(elements.count.textContent, 1);
   assert.equal(elements.clearCart.textContent, 'Clear all 1 demo cart item');
@@ -227,6 +231,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
 
   elements.items.children[0].children[1].onclick();
   assert.equal(context.cart.length, 0);
+  assert.match(elements.result.textContent, /Removed service preview "Service Preview" from demo cart\. 0 demo items remaining\. Preview again to continue\. No order was placed\./);
   assert.equal(elements.items.attributes.role, 'group');
   assert.equal(elements.total.textContent, 'Total: ฿0');
   assert.equal(elements.reviewServicesCart.hidden, true);
