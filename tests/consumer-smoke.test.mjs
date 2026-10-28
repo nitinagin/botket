@@ -497,9 +497,10 @@ test('discover filters and concept-to-profile handoff preserve demo-only behavio
     robotModel: { value: 'Old model' },
     robotMessage: { textContent: '' }
   };
-  let overwritePrompts = 0;
+  let overwritePrompts = 0, draftRefreshes = 0;
   const profileContext = {
     robots: [{ id: 'r2', name: 'Companion Robot Concept' }], mine: [],
+    updateRobotDraftAction: () => { draftRefreshes++; },
     b: { dataset: { robot: 'r2' } },
     byId: id => fields[id],
     window: { confirm: () => { overwritePrompts++; return true; } },
@@ -508,6 +509,7 @@ test('discover filters and concept-to-profile handoff preserve demo-only behavio
   const prefill = new Script('(' + profileSource[1] + ')').runInNewContext(profileContext);
   prefill();
   assert.equal(overwritePrompts, 1, 'Prefilling over an unsaved draft requires confirmation');
+  assert.equal(draftRefreshes, 1, 'Prefilling refreshes the unsaved draft indicator');
   assert.equal(fields.robotNickname.value, 'Companion Robot Concept');
   assert.equal(fields.robotBrand.value, '', 'Never infer a real manufacturer from a concept');
   assert.equal(fields.robotModel.value, '', 'Never infer a compatible device model');
@@ -1667,10 +1669,11 @@ test('Discover concept handoff protects unsaved profile fields when 30 demo prof
     robotMessage: { textContent: '' },
     clearProfiles: { focus() { focused = 'manage'; } }
   };
-  let confirmed = false, prompts = 0;
+  let confirmed = false, prompts = 0, draftRefreshes = 0;
   const context = {
     robots: [{ id: 'r1', name: 'Home Robot Concept' }],
     mine: Array.from({ length: 30 }, (_, i) => ({ id: 'demo-' + i })),
+    updateRobotDraftAction: () => { draftRefreshes++; },
     b: { dataset: { robot: 'r1' } },
     byId: id => fields[id],
     window: { confirm: () => { prompts++; return confirmed; } },
@@ -1702,6 +1705,7 @@ test('Discover concept handoff protects unsaved profile fields when 30 demo prof
   assert.equal(fields.robotBrand.value, '');
   assert.equal(fields.robotModel.value, '');
   assert.equal(focused, 'brand');
+  assert.equal(draftRefreshes, 1, 'Confirmed prefill refreshes the unsaved draft indicator once');
 });
 
 
