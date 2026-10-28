@@ -106,7 +106,7 @@ byId('profileSearch').addEventListener('input',renderMyRobots);
 byId('profileSearch').addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.isComposing&&byId('profileSearch').value){e.preventDefault();byId('profileSearch').value='';renderMyRobots();byId('profileSearch').focus()}});
 byId('clearProfileSearch').onclick=()=>{byId('profileSearch').value='';renderMyRobots();byId('profileSearch').focus()};
 function hasUnsavedRobotDraft(){return [byId('robotNickname'),byId('robotBrand'),byId('robotModel')].some(field=>field.value.trim())}
-function updateRobotDraftAction(){const hasDraft=hasUnsavedRobotDraft();byId('clearRobotDraft').hidden=!hasDraft;byId('robotDraftStatus').textContent=hasDraft?'Unsaved demo profile fields. No profile has been saved or connected.':''}
+function updateRobotDraftAction(){const hasDraft=[byId('robotNickname'),byId('robotBrand'),byId('robotModel')].some(field=>field.value.trim());byId('clearRobotDraft').hidden=!hasDraft;byId('robotDraftStatus').textContent=hasDraft?'Unsaved demo profile fields. No profile has been saved or connected.':''}
 byId('registerRobot').addEventListener('input',updateRobotDraftAction);
 window.addEventListener('beforeunload',e=>{if(!hasUnsavedRobotDraft())return;e.preventDefault();e.returnValue='';});
 byId('clearRobotDraft').onclick=()=>{if(!window.confirm('Discard unsaved demo profile fields? Saved demo profiles will not be affected.'))return;byId('registerRobot').reset();updateRobotDraftAction();byId('robotMessage').textContent='Unsaved demo profile fields cleared. Saved profiles were not changed.';byId('robotNickname').focus()};
