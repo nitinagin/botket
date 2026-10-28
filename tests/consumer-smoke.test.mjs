@@ -548,7 +548,9 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.equal(picker.disabled, true, 'No profiles means no selectable robot');
   assert.deepEqual(picker.children.map(option => option.value), ['']);
   assert.match(page, /id="openRobotsFromSkills">Manage demo robots →</);
-  assert.equal(summary.textContent, 'No demo robot profiles saved. Press Manage demo robots to add a demo robot profile; this does not verify compatibility.');
+  assert.equal(summary.textContent, 'No demo robot profiles saved. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile. Compatibility has not been checked; installation is unavailable.');
+  assert.match(page, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(page, /id="openRobotsFromSkills">Manage demo robots →/);
   assert.doesNotMatch(summary.textContent, /to get started/);
 });
 
@@ -2096,4 +2098,64 @@ test('Skills and Services expose preview cards as labelled lists without compati
   assert.doesNotMatch(plain, /role="listitem"/);
   assert.match(page, /Compatibility is not verified, and installation is unavailable/);
   assert.match(page, /No bookings, service requests or payments are available/);
+});
+
+test('My Robots and Skills show a labelled demo next step before the long mobile content', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots && skills, 'Expected My Robots and Skills sections');
+
+  const robotsButton = robots.indexOf('id="openSkillsFromRobots"');
+  const robotsForm = robots.indexOf('<form id="registerRobot"');
+  const robotsList = robots.indexOf('id="myrobots"');
+  assert.ok(robotsButton > 0 && robotsButton < robotsForm && robotsForm < robotsList,
+    'Explore skill previews stays above the registration form and saved-profile list');
+  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.equal(robots.match(/id="openSkillsFromRobots"/g).length, 1);
+
+  const skillsButton = skills.indexOf('id="openServicesFromSkills"');
+  const skillsCard = skills.indexOf('id="skillcards"');
+  assert.ok(skillsButton > 0 && skillsButton < skillsCard,
+    'Explore service previews stays above the skill preview list');
+  assert.match(skills, /<h2>Skills<\/h2><p class="muted">[^<]*installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
+
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /\.next-step:focus-visible\{outline:3px solid #111;outline-offset:2px\}/);
+  assert.match(page, /@media \(forced-colors: active\)\{\.next-step:focus-visible\{outline-color:Highlight\}\}/);
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /\.buy\.next-step \{ width: 100%; \}/);
+
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected My Robots renderer');
+  const node = () => ({
+    children: [], attributes: {}, className: '', hidden: false, disabled: false, textContent: '',
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; }
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'saveDemoProfile', 'profileCount', 'clearProfiles', 'profileSearch',
+      'clearProfileSearch', 'profileSearchSummary'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const visits = [];
+  const context = {
+    mine: [],
+    byId: id => elements[id],
+    document: { createElement: node },
+    show: tab => visits.push(tab)
+  };
+  new Script('(' + source[0] + ')').runInNewContext(context)();
+  assert.equal(elements.myrobots.children[0].textContent, 'No demo robots added yet.');
+  assert.equal(elements.myrobots.children[1].textContent, 'Press Explore skill previews for generic skill previews, or press Explore robot concepts. You can also use Save demo profile in the form above. None of these actions verifies ownership, compatibility, or connects a device.');
+  assert.doesNotMatch(elements.myrobots.children[1].textContent, /illustrative robot concepts/);
+  const browse = elements.myrobots.children[2];
+  assert.equal(browse.textContent, 'Explore robot concepts →');
+  assert.equal(browse.className, 'next-step');
+  assert.equal(browse.type, 'button');
+  browse.onclick();
+  assert.deepEqual(visits, ['store']);
+  assert.match(app, /Press Browse generic skills \(demo\) on this saved profile\. Compatibility not verified; no device connected\./);
+  assert.match(app, /preview\.className='next-step'/);
 });
