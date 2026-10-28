@@ -1903,6 +1903,8 @@ test('My Robots announces draft state only while unsaved fields exist', () => {
 });
 
 test('Enter in checkout nickname triggers preview only for nonempty demo carts', () => {
+  assert.match(page, /Enter does not preview while the cart is empty\. Press Escape to clear the nickname/);
+  assert.match(page, /cart\.length\?'Press Enter to preview or Escape to clear the nickname\.':'Enter does not preview while the cart is empty\. Press Escape to clear the nickname\.'\)/);
   assert.match(page, /Press Enter to preview or Escape to clear the nickname/);
   const source = app.match(/byId\('name'\)\.addEventListener\('keydown',(e=>\{if\(e\.key==='Enter'[^\n]*\})\);/);
   assert.ok(source, 'Expected a dedicated Enter preview handler');
@@ -1928,6 +1930,89 @@ test('Enter in checkout nickname triggers preview only for nonempty demo carts',
   handler(event('Enter', true));
   assert.equal(clicked, 1, 'IME composition must not trigger an accidental preview');
   assert.equal(prevented, 1);
+});
+
+test('empty checkout says no order was placed and opens My Robots without a cart or preview', () => {
+  assert.match(page, /Your cart is empty\. No order was placed\. Press Open My Robots \(demo profiles\)\. This does not connect a device\./);
+  assert.doesNotMatch(page, /empty\.textContent='Your cart is empty\.'/);
+  assert.match(page, /openRobots\.textContent='Open My Robots \(demo profiles\) →'/);
+  assert.match(page, /aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'/);
+  assert.match(page, /openRobots\.onclick=\(\)=>show\('robots'\)/);
+  assert.match(page, /#items > button\{[^}]*min-height:44px/);
+  assert.match(page, /#items > button\[data-cart-robots\]\{[^}]*background:#e4efe7;color:#111/);
+  const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected demo cart renderer');
+  const node = () => ({
+    children: [], attributes: {}, textContent: '', hidden: false, disabled: false,
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(name, value) { this.attributes[name] = value; }
+  });
+  const elements = Object.fromEntries(
+    ['items', 'cartSummary', 'total', 'count', 'clearCart', 'browseFromCheckout',
+      'preview', 'checkoutToRobots', 'result', 'reviewServicesCart', 'reviewDiscoverCart',
+      'reviewRobotsCart', 'reviewSkillsCart', 'previewNameHint'].map(id => [id, node()])
+  );
+  elements.checkoutToRobots.hidden = true;
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const service = { id: 's1', name: 'Robot Setup', price: 1500 };
+  const destinations = [];
+  const guestHint = 'Leave blank to preview as Guest, or use a nickname rather than your real name. This is an on-page demo preview; no order or personal details are submitted. ';
+  const context = {
+    cart: [], robots: [robot], services: [service], lastBrowseTab: 'store',
+    byId: id => elements[id],
+    document: { createElement: node },
+    money: value => '฿' + value.toLocaleString('en-US'),
+    show: tab => { destinations.push(tab); }
+  };
+  const render = new Script('(' + source[0] + ')').runInNewContext(context);
+  const robotsButton = () => elements.items.children.find(child => Object.hasOwn(child.attributes, 'data-cart-robots'));
+
+  render();
+  assert.equal(elements.cartSummary.textContent, 'Demo cart is empty. No order placed.');
+  assert.equal(elements.items.children[0].textContent, 'Your cart is empty. No order was placed. Press Open My Robots (demo profiles). This does not connect a device.');
+  assert.equal(elements.items.children[1].textContent, 'Browse demo robots →');
+  assert.equal(elements.items.children[1].attributes['data-cart-browse'], '');
+  assert.equal(elements.items.children[1].className, 'buy');
+  const emptyRobots = robotsButton();
+  assert.equal(emptyRobots, elements.items.children[2], 'My Robots stays a separate control from browsing');
+  assert.equal(emptyRobots.type, 'button');
+  assert.equal(emptyRobots.textContent, 'Open My Robots (demo profiles) →');
+  assert.equal(emptyRobots.attributes['aria-label'], 'Open My Robots (demo profiles) →. No order is placed and no device is connected.');
+  assert.equal(elements.previewNameHint.textContent, guestHint + 'Enter does not preview while the cart is empty. Press Escape to clear the nickname.');
+  assert.doesNotMatch(elements.previewNameHint.textContent, /Press Enter to preview/);
+  assert.equal(elements.preview.disabled, true);
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Empty My Robots path does not wait for a preview');
+  emptyRobots.onclick();
+  assert.deepEqual(destinations, ['robots']);
+  assert.equal(context.cart.length, 0, 'My Robots opens with an empty cart');
+  assert.equal(elements.result.textContent, '', 'Opening My Robots does not create an order preview');
+  elements.items.children[1].onclick();
+  assert.deepEqual(destinations, ['robots', 'store']);
+
+  context.lastBrowseTab = 'services';
+  render();
+  assert.equal(elements.items.children[1].textContent, 'Browse service previews →');
+  assert.equal(robotsButton().textContent, 'Open My Robots (demo profiles) →');
+  elements.items.children[1].onclick();
+  robotsButton().onclick();
+  assert.deepEqual(destinations, ['robots', 'store', 'services', 'robots']);
+
+  context.cart = [robot];
+  context.lastBrowseTab = 'store';
+  render();
+  assert.equal(robotsButton(), undefined, 'A nonempty cart keeps the existing preview handoff');
+  assert.equal(elements.preview.disabled, false);
+  assert.equal(elements.previewNameHint.textContent, guestHint + 'Press Enter to preview or Escape to clear the nickname.');
+  context.cart = [service];
+  render();
+  assert.equal(robotsButton(), undefined);
+  assert.match(elements.previewNameHint.textContent, /Press Enter to preview or Escape to clear the nickname\./);
+  context.cart = [];
+  render();
+  assert.equal(robotsButton().textContent, 'Open My Robots (demo profiles) →');
+  assert.equal(elements.previewNameHint.textContent, guestHint + 'Enter does not preview while the cart is empty. Press Escape to clear the nickname.');
+  assert.equal(elements.checkoutToRobots.hidden, true);
 });
 
 test('Escape keeps IME composition intact in Discover, My Robots and Checkout', () => {
