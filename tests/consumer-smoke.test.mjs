@@ -156,7 +156,7 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
     new Script('(' + preview[1] + ')').runInNewContext(context)();
     assert.ok(elements.result.textContent.includes(scenario.expected), scenario.label);
     if (scenario.items.length) {
-      assert.ok(elements.result.textContent.includes('Items: ' + scenario.items.map(item => item.name).join(', ') + '.'), scenario.label + ' lists the demo cart items');
+      assert.ok(elements.result.textContent.includes('Items: ' + scenario.items.map(item => item.name + ' (' + context.money(item.price) + ')').join(', ') + '.'), scenario.label + ' lists the demo cart items');
       assert.match(elements.result.textContent, /No payment or order submission occurred/);
     } else {
       assert.doesNotMatch(elements.result.textContent, /Items:/, 'Empty cart should not show itemized preview');
