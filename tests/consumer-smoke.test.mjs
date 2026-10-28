@@ -59,6 +59,15 @@ test('Discover results expose list semantics only for matching robot concepts', 
   assert.doesNotMatch(generic, /role="listitem"/, 'Service cards should keep their existing semantics');
 });
 
+test('Discover and My Robots search inputs identify their result lists and live summaries', () => {
+  assert.match(page, /id="robotSearch"[^>]*aria-describedby="filterSummary" aria-controls="products"/);
+  assert.match(page, /id="profileSearch"[^>]*aria-describedby="profileSearchSummary" aria-controls="myrobots"/);
+  assert.match(page, /id="filterSummary"[^>]*role="status" aria-live="polite"/);
+  assert.match(page, /id="profileSearchSummary"[^>]*role="status" aria-live="polite"/);
+  assert.match(page, /id="products" aria-label="Robot concept search results"/);
+  assert.match(page, /id="myrobots" class="grid" aria-label="Saved demo robot profiles"/);
+});
+
 test('demo checkout cart exposes list semantics only when populated', () => {
   assert.match(page, /id="items" aria-label="Demo cart items" aria-live="polite"/);
   assert.match(app, /root\.setAttribute\('role',cart\.length\?'list':'group'\)/);
