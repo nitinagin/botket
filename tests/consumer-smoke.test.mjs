@@ -541,8 +541,9 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   update();
   assert.equal(picker.disabled, true, 'No profiles means no selectable robot');
   assert.deepEqual(picker.children.map(option => option.value), ['']);
-  assert.match(summary.textContent, /No demo robot profiles saved/);
-  assert.match(summary.textContent, /does not verify compatibility/);
+  assert.match(page, /id="openRobotsFromSkills">Manage demo robots →</);
+  assert.equal(summary.textContent, 'No demo robot profiles saved. Press Manage demo robots to add a demo robot profile; this does not verify compatibility.');
+  assert.doesNotMatch(summary.textContent, /to get started/);
 });
 
 test('discover filters and concept-to-profile handoff preserve demo-only behavior', () => {
@@ -1180,7 +1181,8 @@ test('Discover concept search combines category filters, normalized terms and ac
 
   context.selectedCategory = 'education';
   render();
-  assert.match(elements.products.innerHTML, /No robot concepts match/);
+  assert.equal(elements.products.innerHTML, '<p class="muted">No robot concepts match. Try another search or press Show all robot concepts.</p>');
+  assert.doesNotMatch(elements.products.innerHTML, /choose All robots/);
   assert.equal(elements.products.role, 'group', 'Empty results are not announced as a list');
   assert.match(elements.filterSummary.textContent, /Showing 0 of 3 robot concepts in education/);
 
@@ -1210,6 +1212,8 @@ test('Discover concept search combines category filters, normalized terms and ac
 
 test('Discover no-results recovery clears both filters and restores all demo concepts', () => {
   assert.match(page, /id="resetDiscoverFilters" hidden>Show all robot concepts/);
+  assert.match(page, /No robot concepts match\. Try another search or press Show all robot concepts\./);
+  assert.doesNotMatch(page, /choose All robots/);
   const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
   const resetSource = app.match(/byId\('resetDiscoverFilters'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   assert.ok(source && resetSource, 'Discover recovery and renderer must exist');
@@ -1238,7 +1242,8 @@ test('Discover no-results recovery clears both filters and restores all demo con
   const reset = new Script('(' + resetSource[1] + ')').runInNewContext(context);
   render();
   assert.equal(elements.resetDiscoverFilters.hidden, false, 'No matches shows recovery');
-  assert.match(elements.products.innerHTML, /No robot concepts match/);
+  assert.equal(elements.products.innerHTML, '<p class="muted">No robot concepts match. Try another search or press Show all robot concepts.</p>');
+  assert.doesNotMatch(elements.products.innerHTML, /All robots/);
   reset();
   assert.equal(context.selectedCategory, 'all');
   assert.equal(elements.robotSearch.value, '');
