@@ -1944,3 +1944,21 @@ test('leaving with an unsaved My Robots draft requests a browser warning without
   fields.robotModel.value = '';
   assert.deepEqual(dispatch(), { prevented: 0, returnValue: undefined }, 'Discarding or saving cleared fields must not warn');
 });
+
+test('Skills and Services expose preview cards as labelled lists without compatibility claims', () => {
+  assert.match(page, /id="skillcards" role="list" aria-label="Generic skill previews"/);
+  assert.match(page, /id="servicecards" role="list" aria-label="Generic service previews"/);
+  const skillLine = app.split('\n').find(line => line.includes("byId('skillcards').innerHTML="));
+  const serviceLine = app.split('\n').find(line => line.includes("byId('servicecards').innerHTML="));
+  assert.ok(skillLine?.includes("'preview-list-card'"));
+  assert.ok(serviceLine?.includes("'preview-list-card'"));
+  const cardSource = app.match(/function card\(x,action,variant=''\)\{[^\n]*\}/)?.[0];
+  assert.ok(cardSource, 'Expected shared preview card renderer');
+  const renderCard = new Script('(' + cardSource + ')').runInNewContext({ money: n => '฿' + n });
+  const preview = renderCard({ name: 'Generic Skill', price: 100 }, '<p>Preview only</p>', 'preview-list-card');
+  const plain = renderCard({ name: 'Generic Skill', price: 100 }, '');
+  assert.match(preview, /^<article role="listitem" class="card preview-list-card">/);
+  assert.doesNotMatch(plain, /role="listitem"/);
+  assert.match(page, /Compatibility is not verified, and installation is unavailable/);
+  assert.match(page, /No bookings, service requests or payments are available/);
+});
