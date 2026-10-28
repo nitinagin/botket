@@ -2187,3 +2187,30 @@ test('mobile Discover keeps the first concept card actions above the fixed botto
   assert.match(app, /Add to demo cart/);
   assert.match(app, /Concept only/);
 });
+
+
+test('Services shows recovery routes before generic cards and names them without claiming compatibility', () => {
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(services, 'Expected Services section');
+  const notice = services.indexOf('id="serviceRobotContext"');
+  const skills = services.indexOf('id="openSkillsFromServices"');
+  const robots = services.indexOf('id="openRobotsFromServices"');
+  const cards = services.indexOf('id="servicecards"');
+  assert.ok(notice > 0 && notice < skills && skills < robots && robots < cards,
+    'Recovery actions stay after context and before long service cards');
+  assert.equal(services.match(/id="openSkillsFromServices"/g).length, 1);
+  assert.equal(services.match(/id="openRobotsFromServices"/g).length, 1);
+  assert.match(services, /class="next-step" id="openSkillsFromServices">Explore generic skill previews →/);
+  assert.match(services, /class="next-step" id="openRobotsFromServices">Manage demo robots →/);
+  assert.match(page, /\.next-step\{[^}]*min-height:44px;min-width:44px/);
+  const source = app.match(/function updateServicesContext\(\)\{[^\n]*\}/);
+  assert.ok(source, 'Expected Services context function');
+  const noticeElement = { textContent: '' };
+  const context = { mine: [], selectedRobotId: null,
+    byId: id => id === 'serviceRobotContext' ? noticeElement : null };
+  new Script('(' + source[0] + ')').runInNewContext(context)();
+  assert.match(noticeElement.textContent, /Press Manage demo robots/);
+  assert.match(noticeElement.textContent, /Explore generic skill previews/);
+  assert.match(noticeElement.textContent, /eligibility and compatibility are unverified/);
+  assert.match(noticeElement.textContent, /no booking is available/);
+});
