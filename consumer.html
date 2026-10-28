@@ -43,10 +43,15 @@
   }
   .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 }
+
+/* Keyboard-first entry point, above the fixed mobile navigation. */
+.skip-link{position:absolute;left:12px;top:-80px;z-index:200;padding:12px 16px;background:#ffdb23;color:#111;border:3px solid #111;box-shadow:4px 4px #111;font-weight:800}
+.skip-link:focus-visible{top:12px}
 </style>
 <link rel="icon" type="image/svg+xml" href="assets/botket-logo.svg"></head><body>
+<a class="skip-link" href="#main-content">Skip to consumer platform</a>
 <header><img src="assets/botket-logo.svg" alt="BOTKET" style="display:block;width:150px;max-width:100%;height:auto" /> · Personal Robotics Platform</header>
-<main><h1>Discover. Preview. Explore.</h1><p>Explore robot concepts, skill previews and service previews in one place.</p><p class="muted">Prototype only: sample listings and prices. Checkout creates an order preview only; no purchases, payments, verified compatibility or device connections.</p>
+<main id="main-content" tabindex="-1"><h1>Discover. Preview. Explore.</h1><p>Explore robot concepts, skill previews and service previews in one place.</p><p class="muted">Prototype only: sample listings and prices. Checkout creates an order preview only; no purchases, payments, verified compatibility or device connections.</p>
 <nav class="tabs" aria-label="Platform sections"><button type="button" class="active" data-tab="store" aria-controls="store" aria-current="page">Discover</button><button type="button" data-tab="cart" aria-controls="cart">Checkout (<span id="count">0</span>)</button><button type="button" data-tab="robots" aria-controls="robots">My Robots</button><button type="button" data-tab="skills" aria-controls="skills">Skills</button><button type="button" data-tab="services" aria-controls="services">Services</button></nav>
 <section id="store"><h2>Explore robots</h2><p class="muted">Illustrative concepts only. No products are available to order through this demo.</p><div class="store-filters" role="group" aria-label="Robot category filters"><button type="button" data-category="all" aria-pressed="true">All robots</button><button type="button" data-category="home" aria-pressed="false">Home</button><button type="button" data-category="companion" aria-pressed="false">Companion</button><button type="button" data-category="education" aria-pressed="false">Education</button></div><label for="robotSearch">Find robot concepts <input id="robotSearch" type="search" maxlength="80" placeholder="Search concept or category" autocomplete="off" aria-describedby="filterSummary"></label><button type="button" id="clearRobotSearch" hidden aria-label="Clear robot concept search">Clear search</button><p id="filterSummary" class="hint" role="status" aria-live="polite"></p><button type="button" id="resetDiscoverFilters" hidden>Show all robot concepts</button><div class="grid" id="products"></div><p><button type="button" id="reviewDiscoverCart" hidden>Review demo cart →</button></p></section>
 
