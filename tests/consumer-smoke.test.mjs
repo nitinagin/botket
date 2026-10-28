@@ -1839,3 +1839,34 @@ test('Enter in checkout nickname triggers preview only for nonempty demo carts',
   assert.equal(clicked, 1, 'IME composition must not trigger an accidental preview');
   assert.equal(prevented, 1);
 });
+
+test('Escape keeps IME composition intact in Discover, My Robots and Checkout', () => {
+  for (const id of ['robotSearch', 'profileSearch', 'name']) {
+    const line = app.split('\n').find(x => x.startsWith("byId('" + id + "').addEventListener('keydown',e=>{if(e.key==='Escape'"));
+    assert.ok(line, 'Expected Escape handler for ' + id);
+    const source = line.match(/,(e=>\{.*\})\);$/);
+    assert.ok(source, 'Expected keyboard callback for ' + id);
+    let prevented = 0, rendered = 0, cleared = 0;
+    const field = { value: '中文', focus() {} };
+    const elements = {
+      [id]: field,
+      clearPreviewName: { onclick() { cleared++; field.value = ''; } }
+    };
+    const handler = new Script('(' + source[1] + ')').runInNewContext({
+      byId: key => elements[key],
+      render: () => { rendered++; },
+      renderMyRobots: () => { rendered++; }
+    });
+    const event = isComposing => ({
+      key: 'Escape', isComposing, preventDefault() { prevented++; }
+    });
+    handler(event(true));
+    assert.equal(field.value, '中文', id + ' must preserve text while composing');
+    assert.equal(prevented, 0, id + ' must not swallow IME Escape');
+    assert.equal(rendered + cleared, 0, id + ' must not trigger a clear action during composition');
+    handler(event(false));
+    assert.equal(field.value, '', id + ' must still clear on a normal Escape');
+    assert.equal(prevented, 1, id + ' must prevent browser Escape after clearing');
+    assert.equal(rendered + cleared, 1, id + ' must trigger exactly one clear action');
+  }
+});
