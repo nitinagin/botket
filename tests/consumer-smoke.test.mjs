@@ -37,6 +37,12 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /scroll-margin-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\)/);
 });
 
+test('demo checkout cart exposes list semantics only when populated', () => {
+  assert.match(page, /id="items" aria-label="Demo cart items" aria-live="polite"/);
+  assert.match(app, /root\.setAttribute\('role',cart\.length\?'list':'group'\)/);
+  assert.match(app, /row\.setAttribute\('role','listitem'\)/);
+});
+
 test('checkout and skills clearly remain demos', () => {
   assert.match(page, /This is an order preview, not a real checkout/i);
   assert.match(page, /No payment, reservation or order submission occurs/i);
@@ -194,6 +200,8 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   elements.name.value = 'Guest nickname';
   elements.checkoutToRobots.hidden = false;
   render();
+  assert.equal(elements.items.attributes.role, 'list');
+  assert.equal(elements.items.children[0].attributes.role, 'listitem');
   assert.equal(elements.total.textContent, 'Total: ฿36,400');
   assert.equal(elements.count.textContent, 2);
   assert.equal(elements.clearCart.textContent, 'Clear all 2 demo cart items');
@@ -211,6 +219,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
 
   elements.items.children[0].children[1].onclick();
   assert.equal(context.cart.length, 0);
+  assert.equal(elements.items.attributes.role, 'group');
   assert.equal(elements.total.textContent, 'Total: ฿0');
   assert.equal(elements.reviewServicesCart.hidden, true);
   assert.equal(elements.preview.disabled, true);
