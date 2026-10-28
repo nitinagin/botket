@@ -1703,3 +1703,52 @@ test('Discover concept handoff protects unsaved profile fields when 30 demo prof
   assert.equal(fields.robotModel.value, '');
   assert.equal(focused, 'brand');
 });
+
+
+test('My Robots can discard unsaved fields without removing saved demo profiles', () => {
+  assert.match(page, /id="clearRobotDraft" type="button" hidden/);
+  assert.match(app, /byId\('registerRobot'\)\.addEventListener\('input',updateRobotDraftAction\)/);
+  assert.match(app, /updateRobotDraftAction\(\);show\('robots'\)/, 'Discover prefill refreshes discard visibility');
+  assert.match(app, /e\.target\.reset\(\);updateRobotDraftAction\(\)/, 'Saving refreshes discard visibility');
+  const helper = app.match(/function updateRobotDraftAction\(\)\{[^\n]*\}/);
+  const handler = app.match(/byId\('clearRobotDraft'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(helper && handler, 'Expected local draft-only clear action');
+  const saved = [{ id: 'existing', name: 'Existing robot' }];
+  let focused = false, accepted = false, prompts = 0;
+  const fields = {
+    robotNickname: { value: 'Unsaved nickname', focus() { focused = true; } },
+    robotBrand: { value: 'Unsaved brand' },
+    robotModel: { value: 'Unsaved model' },
+    robotMessage: { textContent: '' },
+    clearRobotDraft: { hidden: true }
+  };
+  const form = { reset() {
+    fields.robotNickname.value = '';
+    fields.robotBrand.value = '';
+    fields.robotModel.value = '';
+  } };
+  const context = {
+    byId: id => id === 'registerRobot' ? form : fields[id],
+    window: { confirm: () => { prompts++; return accepted; } }
+  };
+  const update = new Script('(' + helper[0] + ')').runInNewContext(context);
+  context.updateRobotDraftAction = update;
+  const discard = new Script('(' + handler[1] + ')').runInNewContext(context);
+  update();
+  assert.equal(fields.clearRobotDraft.hidden, false, 'Filled draft shows discard action');
+  discard();
+  assert.equal(prompts, 1);
+  assert.equal(fields.robotNickname.value, 'Unsaved nickname', 'Cancel preserves draft');
+  assert.equal(focused, false);
+  accepted = true;
+  discard();
+  assert.equal(prompts, 2);
+  assert.deepEqual([fields.robotNickname.value, fields.robotBrand.value, fields.robotModel.value], ['', '', '']);
+  assert.equal(fields.clearRobotDraft.hidden, true, 'Cleared draft hides discard action');
+  assert.equal(focused, true, 'Focus returns to the first field');
+  assert.match(fields.robotMessage.textContent, /Saved profiles were not changed/);
+  assert.equal(saved.length, 1, 'Saved profiles remain untouched');
+  fields.robotBrand.value = 'Another brand';
+  update();
+  assert.equal(fields.clearRobotDraft.hidden, false, 'Typing again restores discard action');
+});
