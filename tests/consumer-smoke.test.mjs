@@ -704,6 +704,29 @@ test('checkout nickname can be cleared without submitting an order or leaving st
   assert.equal(focused, true, 'Focus returns to nickname field');
 });
 
+test('Escape clears checkout nickname, blocks stale preview handoff and preserves other keys', () => {
+  const source = app.match(/byId\('name'\)\.addEventListener\('keydown',(e=>\{[^\n]*\})\);/);
+  assert.ok(source, 'Expected checkout nickname Escape handler');
+  let clears = 0;
+  let prevented = 0;
+  const elements = {
+    name: { value: 'Alex' },
+    clearPreviewName: { onclick() { clears++; elements.name.value = ''; elements.checkoutToRobots.hidden = true; } },
+    checkoutToRobots: { hidden: false }
+  };
+  const handler = new Script('(' + source[1] + ')').runInNewContext({ byId: id => elements[id] });
+  handler({ key: 'Enter', preventDefault() { prevented++; } });
+  assert.equal(clears, 0, 'Other keys must not clear nickname');
+  handler({ key: 'Escape', preventDefault() { prevented++; } });
+  assert.equal(clears, 1, 'Escape must invoke the existing privacy clear action');
+  assert.equal(prevented, 1, 'Escape should not propagate to browser search behavior');
+  assert.equal(elements.name.value, '');
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Escape must invalidate the stale handoff');
+  handler({ key: 'Escape', preventDefault() { prevented++; } });
+  assert.equal(clears, 1, 'Escape with an empty nickname must be a no-op');
+  assert.equal(prevented, 1);
+});
+
 test('mixed robot and service preview routes to My Robots without claiming ownership', () => {
   const addSource = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
   const previewSource = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/);
