@@ -2223,7 +2223,7 @@ test('mobile Services keeps both recovery actions readable before the preview li
   assert.ok(mobile.includes('#services > p:has(.next-step) { display: grid; gap: 8px; margin: 6px 0; }'));
   assert.ok(mobile.includes('#services .next-step { width: 100%; }'));
   assert.ok(mobile.includes('#services > .grid { margin-top: 8px; }'));
-  const services = page.match(/<section id="services"[\\s\\S]*?<\\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
   assert.ok(services, 'Expected Services section');
   assert.ok(services.indexOf('id="openSkillsFromServices"') < services.indexOf('id="servicecards"'));
   assert.ok(services.indexOf('id="openRobotsFromServices"') < services.indexOf('id="servicecards"'));
