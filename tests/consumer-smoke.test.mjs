@@ -1811,3 +1811,31 @@ test('My Robots announces draft state only while unsaved fields exist', () => {
   update();
   assert.equal(fields.robotDraftStatus.textContent, '', 'Clearing the last draft field removes the warning');
 });
+
+test('Enter in checkout nickname triggers preview only for nonempty demo carts', () => {
+  assert.match(page, /Press Enter to preview or Escape to clear the nickname/);
+  const source = app.match(/byId\('name'\)\.addEventListener\('keydown',(e=>\{if\(e\.key==='Enter'[^\n]*\})\);/);
+  assert.ok(source, 'Expected a dedicated Enter preview handler');
+  const cart = [{ id: 'r1' }];
+  let clicked = 0, prevented = 0;
+  const preview = { click() { clicked++; } };
+  const handler = new Script('(' + source[1] + ')').runInNewContext({
+    cart, byId: id => id === 'preview' ? preview : undefined
+  });
+  const event = (key, isComposing = false) => ({
+    key, isComposing, preventDefault() { prevented++; }
+  });
+  handler(event('Enter'));
+  assert.equal(clicked, 1, 'Enter should activate the existing preview button');
+  assert.equal(prevented, 1, 'Prevent implicit submission or navigation');
+  handler(event('Escape'));
+  assert.equal(clicked, 1, 'Escape remains handled by the separate privacy shortcut');
+  cart.pop();
+  handler(event('Enter'));
+  assert.equal(clicked, 1, 'An empty cart must never preview');
+  assert.equal(prevented, 1, 'Empty cart Enter remains a no-op');
+  cart.push({ id: 'r1' });
+  handler(event('Enter', true));
+  assert.equal(clicked, 1, 'IME composition must not trigger an accidental preview');
+  assert.equal(prevented, 1);
+});
