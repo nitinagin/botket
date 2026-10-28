@@ -127,9 +127,9 @@ test('demo cart add handler rejects duplicates, unknown items and the 20-item li
   const match = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/);
   assert.ok(match, 'Expected the demo cart add handler');
 
-  const robot = { id: 'r1', price: 34900 };
-  const anotherRobot = { id: 'r2', price: 24900 };
-  const service = { id: 's1', price: 1500 };
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const anotherRobot = { id: 'r2', name: 'Companion Robot Concept', price: 24900 };
+  const service = { id: 's1', name: 'Robot Setup', price: 1500 };
   const cart = [];
   const button = { dataset: { add: robot.id } };
   const result = { textContent: '' };
@@ -149,6 +149,7 @@ test('demo cart add handler rejects duplicates, unknown items and the 20-item li
   assert.equal(cart.length, 1, 'First robot concept should be added');
   assert.equal(cart[0].id, robot.id);
   assert.equal(destinations.at(-1), 'cart');
+  assert.equal(result.textContent, 'Added robot concept "Home Robot Concept" to demo cart. 1 demo item in cart. Preview again to continue. No order was placed.');
 
   addItem();
   assert.equal(cart.length, 1, 'Repeated click must not duplicate the item');
@@ -158,6 +159,7 @@ test('demo cart add handler rejects duplicates, unknown items and the 20-item li
   addItem();
   assert.equal(cart.length, 2, 'A different service preview can be added');
   assert.equal(cart[1].id, service.id);
+  assert.equal(result.textContent, 'Added service preview "Robot Setup" to demo cart. 2 demo items in cart. Preview again to continue. No order was placed.');
 
   button.dataset.add = 'unknown';
   addItem();
