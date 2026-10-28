@@ -85,6 +85,18 @@
   #store > .grid { margin-top: 4px; }
   .concept-card { gap: 8px; padding: 12px 14px; }
   .concept-card h3 { margin: 0; }
+  /* Services: surface both demo-only recovery routes before the fixed mobile nav. */
+  body:has(#services:not([hidden])) header { padding: 8px 16px; }
+  main:has(#services:not([hidden])) { padding-top: 8px; }
+  main:has(#services:not([hidden])) > h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; }
+  main:has(#services:not([hidden])) > p { margin: 0 0 8px; }
+  #services > h2 { margin: 8px 0 4px; }
+  #services > p.muted { margin: 0 0 6px; }
+  #services > label { margin: 0 0 4px; }
+  #services #serviceRobotContext { margin: 4px 0; padding: 8px 10px; }
+  #services > p:has(.next-step) { display: grid; gap: 8px; margin: 6px 0; }
+  #services .next-step { width: 100%; }
+  #services > .grid { margin-top: 8px; }
 }
 
 /* Keyboard-first entry point, above the fixed mobile navigation. */
