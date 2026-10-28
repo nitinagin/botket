@@ -887,9 +887,10 @@ test('My Robots search normalizes whitespace and case without changing saved det
     { id: 'p2', name: 'Study Bot', brand: 'Sample Maker', model: 'B-2' }
   ];
   const root = {
-    children: [],
+    children: [], attributes: {},
     replaceChildren() { this.children = []; },
-    append(...nodes) { this.children.push(...nodes); }
+    append(...nodes) { this.children.push(...nodes); },
+    setAttribute(key, value) { this.attributes[key] = value; }
   };
   const elements = {
     myrobots: root,
@@ -903,8 +904,8 @@ test('My Robots search normalizes whitespace and case without changing saved det
     clearProfileSearch: { hidden: true }
   };
   const createElement = tag => ({
-    tagName: tag, children: [], textContent: '',
-    setAttribute() {},
+    tagName: tag, children: [], textContent: '', attributes: {},
+    setAttribute(key, value) { this.attributes[key] = value; },
     append(...nodes) { this.children.push(...nodes); },
     focus() {}
   });
@@ -925,6 +926,8 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.equal(elements.clearProfileSearch.hidden, false, 'Clear search is available with matching results');
   assert.equal(root.children.length, 1);
   assert.equal(root.children[0].children[0].textContent, 'Home   Helper');
+  assert.equal(root.attributes.role, 'list', 'Matching saved profiles form an accessible list');
+  assert.equal(root.children[0].attributes.role, 'listitem', 'Each saved profile is a list item');
   assert.equal(mine[0].name, 'Home   Helper', 'Searching must not mutate saved profiles');
 
   elements.profileSearch.value = '  sAMpLE    mAkEr ';
@@ -951,6 +954,7 @@ test('My Robots search normalizes whitespace and case without changing saved det
   render();
   assert.match(elements.profileSearchSummary.textContent, /Showing 0 of 2 matching/);
   assert.equal(root.children.length, 2, 'No matches shows a message and clear-search button');
+  assert.equal(root.attributes.role, 'group', 'Empty search results are not announced as list items');
   root.children[1].onclick();
   assert.equal(elements.profileSearch.value, '');
   assert.equal(elements.profileSearch.focused, true, 'Clearing search restores keyboard focus');
@@ -958,6 +962,7 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.match(elements.profileSearchSummary.textContent, /Showing all 2 demo profile/);
   assert.equal(elements.clearProfiles.textContent, 'Clear all 2 demo profiles', 'Unfiltered clear-all label remains concise');
   assert.equal(elements.clearProfileSearch.hidden, true, 'Clear search hides when query is empty');
+  assert.equal(root.attributes.role, 'list', 'Clearing the filter restores list semantics');
 });
 
 test('My Robots clear-search control resets matching results and preserves input focus', () => {
