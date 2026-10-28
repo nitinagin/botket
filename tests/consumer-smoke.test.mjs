@@ -268,9 +268,12 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   context.cart = [robot, service];
   elements.name.value = 'Guest nickname';
   render();
+  elements.checkoutToRobots.hidden = false;
+  elements.result.textContent = 'Preview for Guest nickname';
   const clear = new Script('(' + clearSource[1] + ')').runInNewContext(context);
   clear();
   assert.equal(context.cart.length, 2, 'Cancel preserves cart');
+  assert.equal(elements.checkoutToRobots.hidden, false, 'Cancel preserves the existing demo preview');
   assert.match(confirmationMessage, /Clear all 2 demo cart items \(1 robot concept, 1 service preview\)/);
   assert.match(confirmationMessage, /This cannot be undone\. No order has been placed/);
   assert.equal(elements.clearCart.textContent, 'Clear all 2 demo cart items');
@@ -279,6 +282,7 @@ test('demo cart remove and clear handlers keep totals and preview state consiste
   assert.equal(context.cart.length, 0);
   assert.equal(elements.count.textContent, 0);
   assert.equal(elements.preview.disabled, true);
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Clearing invalidates the demo preview');
   assert.equal(elements.name.value, '');
   assert.match(elements.result.textContent, /Cart cleared\. No order was placed/i);
 
