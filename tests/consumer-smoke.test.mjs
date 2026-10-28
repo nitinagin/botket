@@ -2159,3 +2159,31 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   assert.match(app, /Press Browse generic skills \(demo\) on this saved profile\. Compatibility not verified; no device connected\./);
   assert.match(app, /preview\.className='next-step'/);
 });
+
+test('mobile Discover keeps the first concept card actions above the fixed bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px the first concept card sat under the fixed bottom nav/);
+  assert.match(mobile, /body:has\(#store:not\(\[hidden\]\)\) header \{ padding: 8px 16px; \}/);
+  assert.match(mobile, /main:has\(#store:not\(\[hidden\]\)\) \{ padding-top: 8px; \}/);
+  assert.match(mobile, /main:has\(#store:not\(\[hidden\]\)\) > h1 \{\s*font-size: 28px;\s*line-height: 1\.15;\s*margin: 0 0 8px;\s*\}/);
+  assert.match(mobile, /main:has\(#store:not\(\[hidden\]\)\) > p \{ margin: 0 0 8px; \}/);
+  assert.match(mobile, /#store > h2 \{ margin: 8px 0 4px; \}/);
+  assert.match(mobile, /#store > p\.muted \{ margin: 0 0 6px; \}/);
+  assert.match(mobile, /#store \.store-filters \{ margin: 0 0 6px; \}/);
+  assert.match(mobile, /#store > label \{ margin: 0 0 4px; \}/);
+  assert.match(mobile, /#store #filterSummary \{ margin: 2px 0 4px; \}/);
+  assert.match(mobile, /#store > \.grid \{ margin-top: 4px; \}/);
+  assert.match(mobile, /\.concept-card \{ gap: 8px; padding: 12px 14px; \}/);
+  assert.match(mobile, /\.concept-card h3 \{ margin: 0; \}/);
+  assert.match(page, /\.concept-actions button\{[^}]*min-height:44px/);
+
+  const store = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(store, 'Expected the Discover section');
+  assert.ok(store.indexOf('id="robotSearch"') < store.indexOf('id="products"'), 'Search stays before the concept cards');
+  assert.ok(store.indexOf('id="products"') < store.indexOf('id="reviewDiscoverCart"'), 'Review demo cart stays after the concept cards');
+  assert.match(store, /Illustrative concepts only\. No products are available to order through this demo\./);
+  assert.match(page, /Prototype only: sample listings and prices\. Checkout creates an order preview only; no purchases, payments, verified compatibility or device connections\./);
+  assert.match(app, /Illustrative price/);
+  assert.match(app, /Add to demo cart/);
+  assert.match(app, /Concept only/);
+});
