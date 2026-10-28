@@ -126,9 +126,9 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
   const handoff = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/);
   assert.ok(preview && handoff, 'Expected both demo checkout handlers');
 
-  const robot = { id: 'r1', price: 34900 };
-  const secondRobot = { id: 'r2', price: 24900 };
-  const service = { id: 's1', price: 1500 };
+  const robot = { id: 'r1', name: 'Home Robot Concept', price: 34900 };
+  const secondRobot = { id: 'r2', name: 'Companion Robot Concept', price: 24900 };
+  const service = { id: 's1', name: 'Robot Setup', price: 1500 };
   const cases = [
     { label: 'robot-only guest', items: [robot], name: '', expected: 'Preview for Guest: 1 robot concept(s), 0 service preview(s), total ฿34,900', destination: 'robots' },
     { label: 'service-only named', items: [service], name: 'Alex', expected: 'Preview for Alex: 0 robot concept(s), 1 service preview(s), total ฿1,500', destination: 'services' },
@@ -155,6 +155,12 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
     };
     new Script('(' + preview[1] + ')').runInNewContext(context)();
     assert.ok(elements.result.textContent.includes(scenario.expected), scenario.label);
+    if (scenario.items.length) {
+      assert.ok(elements.result.textContent.includes('Items: ' + scenario.items.map(item => item.name).join(', ') + '.'), scenario.label + ' lists the demo cart items');
+      assert.match(elements.result.textContent, /No payment or order submission occurred/);
+    } else {
+      assert.doesNotMatch(elements.result.textContent, /Items:/, 'Empty cart should not show itemized preview');
+    }
     assert.equal(elements.checkoutToRobots.hidden, !scenario.items.length, scenario.label);
     if (scenario.destination) {
       new Script('(' + handoff[1] + ')').runInNewContext(context)();
