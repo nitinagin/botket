@@ -223,11 +223,31 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await evaluate("document.querySelector('#openSkillsFromRobots').click()");
     assert.equal(await evaluate("document.querySelector('#skills').hidden"), false);
     assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Compatibility has not been checked/);
+    await evaluate('window.scrollTo(0, 0)');
+    const filledSkills = '#skills #openServicesFromSkills, #skills #skillRobotSelect, #skills #openRobotsFromSkills, #skills #skillcards button';
+    const skillsHandoff = await measureControls('#skills #openServicesFromSkills, #skills #skillRobotSelect, #skills #openRobotsFromSkills');
+    assert.equal(skillsHandoff.controls.length, 3, 'Filled Skills shows the services handoff, profile select, and robots handoff on first paint');
+    assertAboveNav(skillsHandoff, 'Filled Skills handoff');
+    const savedSkills = await bringAboveNav(filledSkills);
+    assert.equal(savedSkills.length, 5, 'Filled Skills shows the handoffs, profile select, and both install previews');
+    assertReachable(savedSkills, 'Filled Skills');
+    const skillsOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    assert.equal(skillsOverflow, 0, 'Filled Skills overflows horizontally by ' + skillsOverflow + 'px');
     await evaluate("document.querySelector('#openServicesFromSkills').click()");
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
     assert.equal(await evaluate("document.querySelector('#servicecards [data-add]') !== null"), true);
     assert.match(await evaluate("document.querySelector('#services > p.muted').textContent"), /No bookings/);
+    await evaluate('window.scrollTo(0, 0)');
+    const filledServices = '#services #serviceRobotSelect, #services #openSkillsFromServices, #services #openRobotsFromServices, #services #servicecards button';
+    const servicesHandoff = await measureControls('#services #serviceRobotSelect, #services #openSkillsFromServices, #services #openRobotsFromServices');
+    assert.equal(servicesHandoff.controls.length, 3, 'Filled Services shows the profile select and both handoffs on first paint');
+    assertAboveNav(servicesHandoff, 'Filled Services handoff');
+    const savedServices = await bringAboveNav(filledServices);
+    assert.equal(savedServices.length, 5, 'Filled Services shows the profile select, handoffs, and both demo service actions');
+    assertReachable(savedServices, 'Filled Services');
+    const servicesOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    assert.equal(servicesOverflow, 0, 'Filled Services overflows horizontally by ' + servicesOverflow + 'px');
 
     // Demo robot profiles are local browser data, unlike the ephemeral demo cart.
     // A reload must restore the profile without implying a purchase or device link.
