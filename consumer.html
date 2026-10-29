@@ -97,13 +97,13 @@
   }
   /* At 320x640, with the heading at the top, Preview order was 200px under the nav and Add demo service was 186px under it. The nickname hint (108px) and the per-service detail sat above those actions. Below 360px only, the action comes first and the full demo wording stays on the page. */
   @media (max-width: 359px) {
-    #services > h2 { margin: 2px 0 0; }
+    #services > h2 { margin: 0; }
     #services > p.muted { margin: 0; }
     #services > label { margin: 0; }
-    #services #serviceRobotContext { margin: 0; padding: 6px 8px; line-height: 1.25; }
-    #services > p:has(.next-step) { margin: 2px 0; gap: 4px; }
+    #services #serviceRobotContext { margin: 0; padding: 4px 8px; line-height: 1.25; }
+    #services > p:has(.next-step) { margin: 0; gap: 2px; }
     #services > .grid { margin-top: 0; }
-    #servicecards .preview-list-card { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px 6px; }
+    #servicecards .preview-list-card { display: flex; flex-direction: column; gap: 2px; padding: 2px 10px 6px; }
     #servicecards .preview-list-card h3 { margin: 0; }
     #servicecards .preview-list-card > p:not(.muted) { margin: 0; }
     #servicecards .preview-list-card > p.muted { margin: 0; }
