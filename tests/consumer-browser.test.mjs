@@ -57,13 +57,18 @@ async function openCDP(url) {
 }
 
 test('real Chrome mobile journey stays demo-only from Discover through Services', { timeout: 60000 }, async () => {
-  const html = readFileSync(join(process.cwd(), 'consumer.html'));
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
   const server = createServer((request, response) => {
-    if (request.url?.split('?')[0] !== '/consumer.html') {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) {
       response.writeHead(404); response.end(); return;
     }
-    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end(html);
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const dir = mkdtempSync(join(tmpdir(), 'botket-browser-'));
@@ -95,15 +100,63 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await send('Page.enable');
     await send('Runtime.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    const measureControls = selector => evaluate(`(() => {
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      return {
+        scrollY: window.scrollY,
+        controls: [...document.querySelectorAll(${JSON.stringify(selector)})]
+          .filter(el => !el.hidden && getComputedStyle(el).display !== 'none')
+          .map(el => {
+            const rect = el.getBoundingClientRect();
+            return { height: rect.height, width: rect.width, gap: nav.top - rect.bottom };
+          })
+      };
+    })()`);
+    const assertAboveNav = (measured, label) => {
+      assert.equal(measured.scrollY, 0, label + ' must be measured on first paint');
+      assert.ok(measured.controls.length > 0, label + ' controls missing');
+      for (const control of measured.controls) {
+        assert.ok(control.gap >= 0, label + ' overlaps the bottom nav by ' + (-control.gap).toFixed(2) + 'px');
+        assert.ok(control.height >= 44 && control.width >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+      }
+    };
+
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
-    await until(() => evaluate("Boolean(document.querySelector('#products [data-add]'))"), 'Discover concepts rendered');
+    await until(() => evaluate("document.querySelector('header img')?.naturalHeight > 0 && Boolean(document.querySelector('#products [data-add]'))"), 'Discover concepts rendered');
     assert.equal(await evaluate("document.querySelector('#store').hidden"), false);
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.tabs')).position"), 'fixed');
+
+    await evaluate("document.querySelector('[data-tab=cart]').click()");
+    await until(() => evaluate("document.querySelector('#cart').hidden === false"), 'Empty checkout opened');
+    assertAboveNav(await measureControls('#items [data-cart-browse], #items [data-cart-robots], #clearCart'), 'Empty checkout');
+    await evaluate("document.querySelector('[data-tab=store]').click()");
+    await until(() => evaluate("document.querySelector('#store').hidden === false"), 'Discover restored');
 
     await evaluate("document.querySelector('#products [data-add]').click()");
     assert.equal(await evaluate("document.querySelector('#cart').hidden"), false);
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '1');
+    assert.equal(await evaluate("document.querySelector('#clearCart').textContent"), 'Clear all 1 demo cart item');
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No order was placed/);
+    assertAboveNav(await measureControls('#items [data-cart-remove], #browseFromCheckout, #clearCart'), 'One-item checkout');
+
+    await evaluate("document.querySelector('[data-tab=services]').click()");
+    await until(() => evaluate("document.querySelector('#services').hidden === false"), 'Services opened');
+    await evaluate("document.querySelector('#servicecards [data-add]').click()");
+    await until(() => evaluate("document.querySelector('#count').textContent === '2' && document.querySelector('#cart').hidden === false"), 'Two-item checkout opened');
+    const multiRemove = await measureControls('#items [data-cart-remove]');
+    assert.equal(multiRemove.scrollY, 0, 'Two-item checkout must be measured on first paint');
+    assert.equal(multiRemove.controls.length, 2, 'Two-item checkout keeps both Remove actions');
+    for (const control of multiRemove.controls) {
+      assert.ok(control.gap >= 0, 'Two-item Remove overlaps the bottom nav by ' + (-control.gap).toFixed(2) + 'px');
+      assert.ok(control.height >= 44 && control.width >= 44, 'Two-item Remove tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+    }
+    await evaluate("document.querySelector('#clearCart').focus()");
+    const multiClear = await measureControls('#clearCart');
+    assert.equal(multiClear.controls.length, 1);
+    assert.ok(multiClear.controls[0].gap >= 0, 'Two-item Clear all overlaps the bottom nav by ' + (-multiClear.controls[0].gap).toFixed(2) + 'px after scroll');
+    assert.ok(multiClear.controls[0].height >= 44 && multiClear.controls[0].width >= 44, 'Two-item Clear all tap target is ' + multiClear.controls[0].width.toFixed(1) + 'x' + multiClear.controls[0].height.toFixed(1));
+    await evaluate("document.querySelectorAll('#items [data-cart-remove]')[1].click()");
+    await until(() => evaluate("document.querySelector('#count').textContent === '1'"), 'Returned to one demo item');
 
     await evaluate("document.querySelector('#preview').click()");
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No payment or order submission occurred/);
