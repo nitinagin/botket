@@ -2460,3 +2460,41 @@ test('mobile filled My Robots keeps profile actions, handoffs, and the profile f
   assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=\(\)=>show\('cart'\)/);
   assert.doesNotMatch(robots, /payment method|place order|buy now|card number|book a service|install now/i);
 });
+
+test('mobile filled Skills and Services keep profile pickers and preview actions at least 44px', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px filled Skills profile select and Install unavailable were 39px tall, and filled Services profile select and Add demo service were 39px/);
+  assert.match(mobile, /#skills #skillRobotSelect,\s*#skills #skillcards button,\s*#services #serviceRobotSelect,\s*#services #servicecards button \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; \}/);
+
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(skills && services, 'Expected Skills and Services sections');
+  const skillServices = skills.indexOf('id="openServicesFromSkills"');
+  const skillSelect = skills.indexOf('id="skillRobotSelect"');
+  const skillRobots = skills.indexOf('id="openRobotsFromSkills"');
+  const skillCards = skills.indexOf('id="skillcards"');
+  assert.ok(skillServices > 0 && skillServices < skillSelect && skillSelect < skillRobots && skillRobots < skillCards,
+    'Filled Skills keeps the services handoff, profile select, and robots handoff above the preview list');
+  assert.match(skills, /class="buy next-step" id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /id="skillRobotSelect"/);
+  assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
+  assert.match(skills, /Compatibility is not verified, and installation is unavailable/);
+  assert.match(app, /aria-label="Install unavailable for '\+x\.name\+' \(preview only; compatibility not verified\)">Install unavailable<\/button>/);
+  assert.match(app, /installation is unavailable/);
+
+  const serviceSelect = services.indexOf('id="serviceRobotSelect"');
+  const serviceSkills = services.indexOf('id="openSkillsFromServices"');
+  const serviceRobots = services.indexOf('id="openRobotsFromServices"');
+  const serviceCards = services.indexOf('id="servicecards"');
+  assert.ok(serviceSelect > 0 && serviceSelect < serviceSkills && serviceSkills < serviceRobots && serviceRobots < serviceCards,
+    'Filled Services keeps the profile select and both handoffs above the preview list');
+  assert.match(services, /id="serviceRobotSelect"/);
+  assert.match(services, /class="next-step" id="openSkillsFromServices">Explore generic skill previews →/);
+  assert.match(services, /class="next-step" id="openRobotsFromServices">Manage demo robots →/);
+  assert.match(services, /No bookings, service requests or payments are available/);
+  assert.match(app, /aria-label="Add '\+x\.name\+' service preview to demo cart \(no booking\)">Add demo service/);
+  assert.match(app, /eligibility and compatibility are unverified/);
+  assert.doesNotMatch(skills + services, /payment method|place order|buy now|card number|book a service|install now/i);
+});
