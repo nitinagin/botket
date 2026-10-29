@@ -621,11 +621,13 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
 
   const ids = ['store', 'cart', 'robots', 'skills', 'services'];
   const focusCounts = Object.fromEntries(ids.map(id => [id, 0]));
+  const headings = {};
   const sections = Object.fromEntries(ids.map(id => [id, {
     hidden: false,
-    querySelector: selector => selector === 'h2' ? {
-      focus() { focusCounts[id]++; }
-    } : null
+    querySelector: selector => {
+      if (selector !== 'h2') return null;
+      return headings[id] ??= { focus() { focusCounts[id]++; } };
+    }
   }]));
   const tabs = ids.map(id => {
     const tab = {
@@ -656,17 +658,24 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
   show('skills');
   checkVisible('skills');
   assert.equal(focusCounts.skills, 1, 'Cross-section navigation focuses the destination heading');
+  assert.equal(headings.skills.tabIndex, -1, 'The destination heading is focusable without entering tab order');
   show('services');
   checkVisible('services');
+  assert.equal(focusCounts.services, 1, 'The services heading is focused once');
+  assert.equal(headings.services.tabIndex, -1);
   assert.equal(context.lastBrowseTab, 'services', 'Services becomes the checkout browse destination');
   show('cart');
   checkVisible('cart');
+  assert.equal(focusCounts.cart, 1, 'The checkout heading is focused once');
+  assert.equal(headings.cart.tabIndex, -1);
   assert.equal(context.lastBrowseTab, 'services', 'Checkout must retain the last browsed catalog');
   show('store', true);
   checkVisible('store');
   assert.equal(context.lastBrowseTab, 'store');
   assert.equal(focusCounts.store, 1, 'Explicit tab navigation focuses the heading');
+  assert.equal(headings.store.tabIndex, -1);
   assert.equal(renders, 4, 'Each navigation rerenders the active demo state');
+  assert.equal([...source[0].matchAll(/heading\.focus\(\)/g)].length, 1, 'A section change focuses its heading once');
 
   for (const [id, expected] of [
     ['openDiscoverFromRobots', 'store'],
@@ -2531,4 +2540,20 @@ test('mobile bottom navigation keeps 44px targets, the current section, and a vi
   assert.match(page, /\.tabs button\.active::after,\.tabs button\[aria-current=page\]::after\{content:"";position:absolute;top:4px;left:8px;right:8px;height:4px;border-radius:2px;background:#111;pointer-events:none\}/);
   assert.match(mobile, /\.tabs button:focus-visible \{\s*outline: 3px solid #111;\s*outline-offset: 1px;\s*\}/);
   assert.doesNotMatch(buttonRule, /outline:\s*none|outline:\s*0/);
+});
+
+test('section changes move focus to the heading once and do not smooth-scroll or announce it twice', () => {
+  assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\)/);
+  assert.doesNotMatch(app, /scrollIntoView|behavior:\s*['"]smooth['"]|scroll-behavior:\s*smooth/);
+  assert.doesNotMatch(page, /scroll-behavior:\s*smooth/);
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.equal([...show.matchAll(/heading\.focus\(\)/g)].length, 1);
+  for (const id of ['store', 'robots', 'skills', 'services', 'cart']) {
+    const section = page.match(new RegExp('<section id="' + id + '"[^>]*>[\\s\\S]*?</section>'))?.[0];
+    assert.ok(section, 'Missing section ' + id);
+    const heading = section.match(/<h2[^>]*>[^<]+<\/h2>/)?.[0];
+    assert.ok(heading, id + ' needs a heading for keyboard and screen reader entry');
+    assert.doesNotMatch(heading, /aria-live|role="status"|role="alert"/);
+    assert.doesNotMatch(section.slice(0, section.indexOf('<h2')), /aria-live|role="status"|role="alert"/);
+  }
 });
