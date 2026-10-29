@@ -23,11 +23,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
+          package-manager-cache: false
       - name: Verify Chrome is installed
         run: command -v google-chrome || command -v chromium || command -v chromium-browser
       - name: Test full demo journey in headless mobile Chrome
