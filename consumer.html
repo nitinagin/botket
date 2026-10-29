@@ -133,6 +133,9 @@
   /* At 390px one robot concept in Checkout put Clear all about 1.9px under the fixed bottom nav. */
   #cart #total { margin: 8px 0; }
   #cart .cart-actions button { box-sizing: border-box; min-height: 44px; min-width: 44px; margin-top: 0; }
+  /* At 320x640 filled Checkout the preview nickname was 37px tall and Clear preview name was 39px. */
+  #cart #name,
+  #cart #clearPreviewName { box-sizing: border-box; min-height: 44px; min-width: 44px; }
   /* At 390px Manage demo robots in Skills sat under the fixed bottom nav. */
   body:has(#skills:not([hidden])) header { padding: 8px 16px; }
   main:has(#skills:not([hidden])) { padding-top: 8px; }
@@ -172,6 +175,9 @@
     min-height: 44px;
     min-width: 44px;
   }
+  /* At 320x640 filled Skills and Services, Review demo cart was 39px tall. */
+  #skills #reviewSkillsCart,
+  #services #reviewServicesCart { box-sizing: border-box; min-height: 44px; min-width: 44px; }
 }
 
 /* Keyboard-first entry point, above the fixed mobile navigation. */

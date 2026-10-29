@@ -947,3 +947,312 @@ test('empty Checkout, My Robots, Skills, and Services stay inside 320 and 390 ph
     }
   }
 });
+
+test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-filled-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) {
+        const detail = response.exceptionDetails;
+        throw new Error('Browser JS exception: ' + detail.text + ' ' + (detail.exception?.description || ''));
+      }
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const forbidden = /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i;
+    const measure = `(() => {
+      window.scrollTo(0, 0);
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const navBar = () => document.querySelector('.tabs').getBoundingClientRect();
+      const visible = el => {
+        if (!el || el.hidden || el.closest('[hidden]')) return false;
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && (el.getBoundingClientRect().width > 0 || el.getBoundingClientRect().height > 0);
+      };
+      const linesOf = el => {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return [...range.getClientRects()].filter(line => line.width > 0.5 && line.height > 0.5).map(line => ({
+            left: line.left, right: line.right, top: line.top, bottom: line.bottom
+          }));
+        } catch { return []; }
+      };
+      const accessibleName = el => {
+        const explicit = text(el.getAttribute('aria-label'));
+        if (explicit) return explicit;
+        if (el.labels && el.labels.length) {
+          const fromLabel = text([...el.labels].map(label => [...label.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join(' ')).join(' '));
+          if (fromLabel) return fromLabel;
+        }
+        return text(el.innerText || el.textContent || el.getAttribute('title') || el.getAttribute('alt') || '');
+      };
+      const boxOf = el => {
+        const rect = el.getBoundingClientRect();
+        const parent = el.parentElement ? el.parentElement.getBoundingClientRect() : rect;
+        return {
+          text: text(el.innerText || el.textContent || '').slice(0, 180),
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+          width: rect.width, height: rect.height,
+          gap: navBar().top - rect.bottom,
+          parentLeft: parent.left, parentRight: parent.right, parentTop: parent.top, parentBottom: parent.bottom,
+          scrollGap: el.scrollWidth - el.clientWidth,
+          lines: linesOf(el)
+        };
+      };
+      const reach = el => {
+        window.scrollTo(0, 0);
+        let rect = el.getBoundingClientRect();
+        let overlap = rect.bottom - navBar().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        overlap = rect.bottom - navBar().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        const bar = navBar();
+        const result = { top: rect.top, gap: bar.top - rect.bottom, width: rect.width, height: rect.height };
+        window.scrollTo(0, 0);
+        return result;
+      };
+      const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+      const textSelector = 'h2, h3, #cartSummary, .cart-row span, #total, #result, #robotMessage, #profileCount, #profileSearchSummary, #skillsRobotSummary, #serviceRobotContext, #myrobots .status, #myrobots p, #skillcards p, #servicecards p';
+      const textEls = [...new Set([document.querySelector('main > h1'), ...section.querySelectorAll(textSelector)].filter(visible))];
+      const controlEls = [...section.querySelectorAll('button, a[href], input, select, textarea')].filter(visible);
+      const navEls = [...document.querySelectorAll('.tabs button')].filter(visible);
+      const footerEls = [...document.querySelectorAll('footer a')].filter(visible);
+      const described = controlEls.map(el => ({ el, box: boxOf(el), name: accessibleName(el), reached: reach(el) }));
+      const painted = textEls.map(el => ({ el, box: boxOf(el) }));
+      const overlapEntries = [
+        ...painted.map(entry => ({ el: entry.el, text: entry.box.text, lines: entry.box.lines })),
+        ...described.filter(entry => entry.el.matches('button, a[href]')).map(entry => ({ el: entry.el, text: entry.name, lines: entry.box.lines }))
+      ];
+      const overlaps = [];
+      for (let i = 0; i < overlapEntries.length; i++) {
+        for (let j = i + 1; j < overlapEntries.length; j++) {
+          const a = overlapEntries[i], b = overlapEntries[j];
+          if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+          for (const la of a.lines) for (const lb of b.lines) {
+            const x = Math.min(la.right, lb.right) - Math.max(la.left, lb.left);
+            const y = Math.min(la.bottom, lb.bottom) - Math.max(la.top, lb.top);
+            if (x > 2 && y > 8) overlaps.push({ a: a.text.slice(0, 60), b: b.text.slice(0, 60), x: Math.round(x), y: Math.round(y) });
+          }
+        }
+      }
+      return {
+        overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+        width: window.innerWidth,
+        scrollY: window.scrollY,
+        section: section.id,
+        count: document.querySelector('#count').textContent,
+        navTop: navBar().top,
+        copy: text(section.innerText),
+        h1: boxOf(document.querySelector('main > h1')),
+        heading: boxOf(section.querySelector('h2')),
+        texts: painted.map(entry => entry.box),
+        controls: described.map(entry => ({ id: entry.el.id, disabled: Boolean(entry.el.disabled), name: entry.name, reached: entry.reached, ...entry.box })),
+        nav: navEls.map(el => ({ ...boxOf(el), name: accessibleName(el) })),
+        footer: footerEls.map(el => ({ ...boxOf(el), name: accessibleName(el), reached: reach(el) })),
+        overlaps: overlaps.slice(0, 8)
+      };
+    })()`;
+    const round = value => Math.round(value * 10) / 10;
+    const assertInside = (box, label, width) => {
+      assert.ok(box, label + ' is missing');
+      assert.ok(box.left >= -1 && box.right <= width + 1, label + ' leaves the viewport at ' + round(box.right) + 'px');
+      assert.ok(box.left >= box.parentLeft - 1 && box.right <= box.parentRight + 1, label + ' leaves its box (' + round(box.left) + '..' + round(box.right) + ' vs ' + round(box.parentLeft) + '..' + round(box.parentRight) + ')');
+      assert.ok(box.scrollGap <= 1, label + ' clips text by ' + round(box.scrollGap) + 'px');
+      assert.ok(box.lines.length > 0, label + ' has no text');
+      for (const line of box.lines) {
+        assert.ok(line.left >= box.left - 1 && line.right <= box.right + 1, label + ' text runs to ' + round(line.right) + 'px outside ' + round(box.right) + 'px');
+        assert.ok(line.top >= box.top - 4 && line.bottom <= box.bottom + 4, label + ' text leaves its box vertically (' + round(line.top) + '..' + round(line.bottom) + ' vs ' + round(box.top) + '..' + round(box.bottom) + ')');
+      }
+    };
+    const assertControl = (control, label, width) => {
+      assert.ok(control.name.length > 0, label + ' has an empty accessible name');
+      assert.ok(control.width >= 44 && control.height >= 44, label + ' tap target is ' + round(control.width) + 'x' + round(control.height));
+      assert.ok(control.left >= -1 && control.right <= width + 1, label + ' leaves the viewport at ' + round(control.right) + 'px');
+      assert.ok(control.left >= control.parentLeft - 1 && control.right <= control.parentRight + 1, label + ' leaves its box');
+      if (control.lines.length) {
+        assert.ok(control.scrollGap <= 1, label + ' clips text by ' + round(control.scrollGap) + 'px');
+        for (const line of control.lines) {
+          assert.ok(line.left >= control.left - 1 && line.right <= control.right + 1, label + ' text runs to ' + round(line.right) + 'px');
+          assert.ok(line.top >= control.top - 4 && line.bottom <= control.bottom + 4, label + ' text leaves its box vertically (' + round(line.top) + '..' + round(line.bottom) + ' vs ' + round(control.top) + '..' + round(control.bottom) + ')');
+        }
+      }
+      const onFirstPaint = control.top >= -0.5 && control.gap >= -0.5;
+      const reached = control.reached.top >= -0.5 && control.reached.gap >= -0.5 && control.reached.width >= 44 && control.reached.height >= 44;
+      assert.ok(onFirstPaint || reached, label + ' is not above the bottom nav on first paint (gap ' + round(control.gap) + 'px) or after scrolling (gap ' + round(control.reached.gap) + 'px, top ' + round(control.reached.top) + 'px)');
+      return onFirstPaint;
+    };
+    const audit = async (label, expects) => {
+      await evaluate('window.scrollTo(0, 0)');
+      const layout = await evaluate(measure);
+      assert.equal(layout.overflow, 0, label + ' overflows horizontally by ' + layout.overflow + 'px');
+      assert.equal(layout.scrollY, 0, label + ' must be measured on first paint');
+      assert.equal(layout.section, expects.section, label);
+      assert.equal(layout.heading.text, expects.heading, label + ' heading');
+      assert.ok(layout.heading.top >= -0.5 && layout.heading.bottom <= layout.navTop + 0.5, label + ' heading is not fully above the bottom nav');
+      assertInside(layout.h1, label + ' page heading', layout.width);
+      assertInside(layout.heading, label + ' heading', layout.width);
+      for (const item of layout.texts) {
+        if (!item.text) continue;
+        assertInside(item, label + ' item "' + item.text.slice(0, 70) + '"', layout.width);
+      }
+      assert.equal(layout.overlaps.length, 0, label + ' text overlaps: ' + JSON.stringify(layout.overlaps));
+      assert.ok(layout.controls.length >= expects.minControls, label + ' controls');
+      for (const control of layout.controls) assertControl(control, label + ' ' + (control.id || control.name.slice(0, 70)), layout.width);
+      for (const control of layout.nav) {
+        const where = label + ' nav ' + control.name;
+        assert.ok(control.name.length > 0, where + ' has an empty accessible name');
+        assert.ok(control.width >= 44 && control.height >= 44, where + ' tap target is ' + round(control.width) + 'x' + round(control.height));
+        assertInside(control, where, layout.width);
+      }
+      for (const control of layout.footer) {
+        assertControl(control, label + ' footer ' + control.name, layout.width);
+        assertInside(control, label + ' footer ' + control.name, layout.width);
+      }
+      if (expects.firstPaint) {
+        for (const name of expects.firstPaint) {
+          assert.ok(layout.controls.some(control => control.name.includes(name) && control.top >= -0.5 && control.gap >= -0.5), label + ' lost the 390px first-paint action "' + name + '"');
+        }
+      }
+      assert.doesNotMatch(layout.copy + ' ' + layout.controls.map(control => control.name).join(' '), forbidden, label + ' implies a real purchase, connection, or verified compatibility');
+      for (const phrase of expects.phrases) assert.ok(layout.copy.includes(phrase) || layout.controls.some(control => control.name.includes(phrase)), label + ' missing demo copy: ' + phrase);
+      console.log('MEASURE ' + label + ' overflow=' + layout.overflow + ' ' + layout.controls.map(control => (control.id || control.name.slice(0, 42)) + ' ' + round(control.width) + 'x' + round(control.height) + ' gap=' + round(control.gap) + ' reach=' + round(control.reached.gap)).join(' | '));
+      return layout;
+    };
+
+    const runJourney = async (width, height) => {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#products [data-add]") !== null'), width + ' page ready');
+      await evaluate("localStorage.clear()");
+      await send('Page.reload', { ignoreCache: true });
+      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#products [data-add]") !== null && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), width + ' fresh demo');
+      const at = label => width + 'x' + height + ' ' + label;
+      const keep390 = names => width === 390 ? names : null;
+
+      await evaluate("document.querySelector('#products [data-add]').click()");
+      await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '1'"), 'one demo robot in checkout');
+      await audit(at('checkout-1'), {
+        section: 'cart',
+        heading: 'Demo checkout',
+        minControls: 5,
+        firstPaint: keep390(['Remove robot concept', 'Continue browsing robot concepts', 'Clear all 1 demo cart item']),
+        phrases: ['not a real checkout', 'no order placed', 'demo only', 'No order was placed']
+      });
+
+      await evaluate("document.querySelector('[data-tab=store]').click()");
+      await until(() => evaluate("document.querySelector('#store').hidden === false && document.querySelector('#reviewDiscoverCart').hidden === false && document.querySelector('#products [data-add]:not([disabled])') !== null"), 'Discover shows the first concept in the demo cart');
+      await evaluate("document.querySelector('#products [data-add]:not([disabled])').click()");
+      await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '2' && document.querySelectorAll('#items [data-cart-remove]').length === 2"), 'two demo robots in checkout');
+      await audit(at('checkout-2'), {
+        section: 'cart',
+        heading: 'Demo checkout',
+        minControls: 6,
+        firstPaint: keep390(['Remove robot concept']),
+        phrases: ['not a real checkout', 'robot concept(s)', 'Illustrative prices only', 'demo only']
+      });
+
+      await evaluate("document.querySelector('#name').value='Demo nick'; document.querySelector('#name').dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#preview').click()");
+      await until(() => evaluate("document.querySelector('#clearPreviewName').hidden === false && document.querySelector('#checkoutToRobots').hidden === false"), 'preview nickname and My Robots handoff shown');
+      const preview = await audit(at('checkout-preview'), {
+        section: 'cart',
+        heading: 'Demo checkout',
+        minControls: 7,
+        firstPaint: null,
+        phrases: ['No payment or order submission occurred', 'not a real checkout']
+      });
+      assert.ok(preview.controls.some(control => control.id === 'name' && control.height >= 44), 'Preview nickname is below 44px');
+      assert.ok(preview.controls.some(control => control.id === 'clearPreviewName' && control.name === 'Clear checkout preview nickname' && control.height >= 44), 'Clear preview name is below 44px or unnamed');
+      assert.ok(preview.controls.some(control => control.id === 'checkoutToRobots' && control.name === 'Continue to My Robots (demo) →'), 'Missing demo My Robots handoff');
+
+      await evaluate("document.querySelector('#checkoutToRobots').click()");
+      await until(() => evaluate("document.querySelector('#robots').hidden === false"), 'My Robots opened from checkout');
+      assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase/);
+      await evaluate("document.querySelector('#robotNickname').value='Home helper'; document.querySelector('#robotBrand').value='Example Robotics'; document.querySelector('#robotModel').value='Model A'; document.querySelector('#registerRobot').requestSubmit()");
+      await until(() => evaluate("document.querySelector('#profileCount').textContent.includes('1 of 30') && document.querySelector('#myrobots h3') !== null"), 'demo profile saved');
+      await audit(at('robots'), {
+        section: 'robots',
+        heading: 'My Robots',
+        minControls: 8,
+        firstPaint: keep390(['Explore skill previews']),
+        phrases: ['does not verify ownership or connect hardware', 'Compatibility not verified', 'Not connected', 'Home helper', 'Example Robotics']
+      });
+
+      await evaluate("document.querySelector('#openSkillsFromRobots').click()");
+      await until(() => evaluate("document.querySelector('#skills').hidden === false && document.querySelector('#skillsRobotSummary').textContent.includes('Home helper')"), 'Skills opened with the demo profile');
+      const skills = await audit(at('skills'), {
+        section: 'skills',
+        heading: 'Skills',
+        minControls: 6,
+        firstPaint: keep390(['Explore service previews', 'Preview for demo profile', 'Manage demo robots']),
+        phrases: ['installation is unavailable', 'Compatibility has not been checked', 'Home helper', 'Example Robotics', 'Model A']
+      });
+      assert.ok(skills.controls.some(control => control.id === 'reviewSkillsCart' && control.height >= 44 && control.name.includes('Review demo cart')), 'Skills review action is below 44px');
+      assert.ok(skills.controls.some(control => control.name.includes('Install unavailable') && control.name.includes('compatibility not verified') && control.disabled), 'Install preview is missing its demo-only name');
+
+      await evaluate("document.querySelector('#openServicesFromSkills').click()");
+      await until(() => evaluate("document.querySelector('#services').hidden === false && document.querySelector('#serviceRobotContext').textContent.includes('Home helper')"), 'Services opened with the demo profile');
+      const services = await audit(at('services'), {
+        section: 'services',
+        heading: 'Services',
+        minControls: 6,
+        firstPaint: keep390(['Preview for demo profile', 'Explore generic skill previews', 'Manage demo robots']),
+        phrases: ['No bookings', 'eligibility and compatibility are unverified', 'no booking is available', 'Home helper']
+      });
+      assert.ok(services.controls.some(control => control.id === 'reviewServicesCart' && control.height >= 44 && control.name.includes('Review demo cart')), 'Services review action is below 44px');
+      assert.equal(services.controls.filter(control => control.name.includes('no booking') && !control.disabled).length, 2, 'Both demo service actions should stay available');
+    };
+
+    await runJourney(320, 640);
+    await runJourney(390, 844);
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});

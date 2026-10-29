@@ -2660,6 +2660,31 @@ test('narrow empty states keep named demo recovery actions at least 44px and scr
   assert.doesNotMatch(emptyCopy, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i);
 });
 
+test('narrow filled Checkout, Skills, and Services keep nickname and review actions at least 44px', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 320x640 filled Checkout the preview nickname was 37px tall and Clear preview name was 39px/);
+  assert.match(mobile, /#cart #name,\s*#cart #clearPreviewName \{ box-sizing: border-box; min-height: 44px; min-width: 44px; \}/);
+  assert.match(mobile, /At 320x640 filled Skills and Services, Review demo cart was 39px tall/);
+  assert.match(mobile, /#skills #reviewSkillsCart,\s*#services #reviewServicesCart \{ box-sizing: border-box; min-height: 44px; min-width: 44px; \}/);
+  assert.match(mobile, /#cart #preview,\s*#cart #checkoutToRobots \{ box-sizing: border-box; min-height: 44px; min-width: 44px; \}/);
+  assert.match(mobile, /#robots #reviewRobotsCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart && skills && services, 'Expected Checkout, Skills, and Services');
+  assert.match(cart, /id="name"[^>]*maxlength="80"/);
+  assert.match(cart, /id="clearPreviewName" hidden aria-label="Clear checkout preview nickname"/);
+  assert.match(cart, /This is an order preview, not a real checkout\. No payment, reservation or order submission occurs\./);
+  assert.match(skills, /id="reviewSkillsCart" hidden>Review demo cart →/);
+  assert.match(services, /id="reviewServicesCart" hidden>Review demo cart →/);
+  assert.match(app, /byId\('reviewSkillsCart'\)\.hidden=!cart\.length/);
+  assert.match(app, /byId\('reviewServicesCart'\)\.onclick=\(\)=>show\('cart'\)/);
+  assert.match(app, /No payment or order submission occurred/);
+  assert.match(app, /this does not confirm purchase, ownership, compatibility or hardware connection/);
+  assert.doesNotMatch(cart + skills + services, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i);
+});
+
 test('section changes move focus to the heading once and do not smooth-scroll or announce it twice', () => {
   assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\)/);
   assert.doesNotMatch(app, /scrollIntoView|behavior:\s*['"]smooth['"]|scroll-behavior:\s*smooth/);
