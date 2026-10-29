@@ -3175,3 +3175,58 @@ test('mobile consumer text and field boundaries meet WCAG 2.2 AA contrast', () =
     assertContrast('#111111', background, 3, 'black focus ring on ' + background);
   }
 });
+
+test('mobile consumer header logo and non-text indicators meet WCAG 2.2 AA contrast', () => {
+  const channel = value => {
+    const s = value / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const rgb = hex => {
+    const raw = hex.slice(1);
+    const full = raw.length === 3 ? raw.replace(/./g, digit => digit + digit) : raw;
+    return [0, 2, 4].map(index => parseInt(full.slice(index, index + 2), 16));
+  };
+  const contrast = (foreground, background) => {
+    const hi = Math.max(lum(rgb(foreground)), lum(rgb(background)));
+    const lo = Math.min(lum(rgb(foreground)), lum(rgb(background)));
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const assertContrast = (foreground, background, minimum, label) => {
+    const ratio = contrast(foreground, background);
+    assert.ok(ratio >= minimum, label + ': ' + foreground + ' on ' + background + ' is ' + ratio.toFixed(2) + ':1, needs ' + minimum + ':1');
+    return ratio;
+  };
+
+  const logo = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../assets/botket-logo.svg'), 'utf8');
+  const fills = [...logo.matchAll(/fill="#([0-9a-fA-F]{6})"/g)].map(match => '#' + match[1].toLowerCase());
+  assert.deepEqual(fills, ['#10ac39', '#fa202a']);
+  assert.match(page, /header\{background:white;/);
+  assert.match(page, /<header><img src="assets\/botket-logo\.svg" alt="BOTKET"/);
+  assert.doesNotMatch(page, /type="(?:checkbox|radio)"/);
+
+  const previousGreen = contrast('#10ad39', '#ffffff');
+  assert.ok(previousGreen < 3, 'the previous logo green #10ad39 on white is ' + previousGreen.toFixed(2) + ':1 and must stay below 3 so the regression stays visible');
+  const logoGreen = assertContrast('#10ac39', '#ffffff', 3, 'header logo green on the white header');
+  const logoRed = assertContrast('#fa202a', '#ffffff', 3, 'header logo red mark on the white header');
+  assert.ok(logoGreen < contrast('#10ab39', '#ffffff'), 'logo green should be the smallest step above 3:1');
+  assert.ok(logoRed > logoGreen);
+
+  assert.match(page, /\.tabs button\{border:2px solid #111;/);
+  assert.match(page, /\.tabs button\.active::after,\.tabs button\[aria-current=page\]::after\{[^}]*background:#111;/);
+  assert.match(page, /\.status\{font-size:13px;color:#80601c;background:#fff3d8;[^}]*\}/);
+  assert.doesNotMatch(page, /\.status\{[^}]*(?:border|outline)\s*:/);
+  assert.match(page, /\.tabs button,button\{[^}]*border:0;/);
+  assert.doesNotMatch(page, /\.store-filters button\{[^}]*border\s*:/);
+
+  const indicators = [
+    ['#111111', '#10b847', 'bottom nav current bar on the active tab'],
+    ['#111111', '#e4efe7', 'bottom nav border on an inactive tab'],
+    ['#111111', '#fffdf5', 'bottom nav border on the page'],
+    ['#111111', '#ffffff', 'card and price borders on white'],
+    ['#111111', '#ffdb23', 'illustrative price border on yellow'],
+    ['#087d3c', '#edf7ef', 'service note accent on the note background'],
+    ['#087d3c', '#fffdf5', 'service note accent on the page']
+  ];
+  for (const [foreground, background, label] of indicators) assertContrast(foreground, background, 3, label);
+});
