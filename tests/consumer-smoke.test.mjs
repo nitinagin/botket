@@ -95,7 +95,9 @@ test('Discover and My Robots search inputs identify their result lists and live 
 });
 
 test('demo checkout cart exposes list semantics only when populated', () => {
-  assert.match(page, /id="items" aria-label="Demo cart items" aria-live="polite"/);
+  assert.match(page, /id="items" aria-label="Demo cart items"/);
+  assert.doesNotMatch(page, /id="items"[^>]*aria-live/, 'Rebuilding the cart list must not announce every row and Remove button');
+  assert.doesNotMatch(page, /id="cartSummary"[^>]*(?:role="status"|aria-live)/, 'The visible cart summary must not repeat the checkout status');
   assert.match(app, /root\.setAttribute\('role',cart\.length\?'list':'group'\)/);
   assert.match(app, /row\.setAttribute\('role','listitem'\)/);
 });
@@ -783,7 +785,7 @@ test('editing checkout nickname invalidates stale preview before handoff', () =>
   onNameInput();
   assert.equal(elements.clearPreviewName.hidden, false, 'Typed nickname exposes privacy clear control');
   assert.equal(elements.checkoutToRobots.hidden, true, 'Changed nickname must block stale handoff');
-  assert.match(elements.result.textContent, /Name changed\. Preview again to continue/);
+  assert.match(elements.result.textContent, /Name changed\. Preview again to continue\. No order was placed\./);
 
   preview();
   assert.equal(elements.checkoutToRobots.hidden, false, 'Fresh preview restores handoff');
@@ -807,8 +809,100 @@ test('checkout nickname can be cleared without submitting an order or leaving st
   assert.equal(elements.name.value, '');
   assert.equal(elements.clearPreviewName.hidden, true);
   assert.equal(elements.checkoutToRobots.hidden, true, 'Clearing nickname invalidates preview handoff');
-  assert.match(elements.result.textContent, /Name cleared\. Preview again to continue/);
+  assert.match(elements.result.textContent, /Name cleared\. Preview again to continue\. No order or personal details were submitted\./);
   assert.equal(focused, true, 'Focus returns to nickname field');
+
+  elements.checkoutToRobots.hidden = true;
+  elements.name.value = 'Alex';
+  elements.result.textContent = 'Added robot concept "Home Robot Concept" to demo cart.';
+  elements.clearPreviewName.hidden = false;
+  focused = false;
+  clear();
+  assert.equal(elements.name.value, '');
+  assert.equal(elements.checkoutToRobots.hidden, true, 'Clearing a nickname before preview does not open a handoff');
+  assert.equal(elements.result.textContent, 'Preview name cleared. This is an on-page demo preview; no order or personal details are submitted.');
+  assert.equal(focused, true, 'Focus still returns to the nickname field');
+});
+
+test('demo state changes announce once from a polite live region already in the page', () => {
+  const openingTag = id => {
+    const tag = page.match(new RegExp('<[a-z][^>]*\\sid="' + id + '"[^>]*>', 'i'))?.[0];
+    assert.ok(tag, 'Expected a static live region for ' + id);
+    return tag;
+  };
+  const politeStatus = tag => {
+    assert.match(tag, /role="status"/);
+    assert.doesNotMatch(tag, /aria-live="(?:off|assertive)"/);
+  };
+  politeStatus(openingTag('result'));
+  assert.match(openingTag('result'), /aria-live="polite"/);
+  politeStatus(openingTag('robotMessage'));
+  politeStatus(openingTag('skillsRobotSummary'));
+  assert.doesNotMatch(openingTag('cartSummary'), /role="status"|aria-live/);
+  assert.doesNotMatch(openingTag('items'), /aria-live|role="status"|role="alert"/);
+  assert.doesNotMatch(app, /createElement\([^)]*\)[^;]{0,80}id=.result|setAttribute\('id','result'\)/);
+
+  const add = app.match(/document\.querySelectorAll\('\[data-add\]'\)\.forEach\(b=>b\.onclick=(\(\)=>\{[^\n]*\})\);/)?.[1] ?? '';
+  const addedAt = add.lastIndexOf("byId('result').textContent='Added ");
+  assert.ok(addedAt > add.lastIndexOf("show('cart')"), 'Add announces only after checkout is visible');
+  assert.match(add, /Added '\+kind\+' "'\+x\.name\+'" to demo cart\./);
+  assert.match(add, /No order was placed\./);
+  assert.doesNotMatch(add, /\.focus\(/);
+  assert.match(add, /robot concept':'service preview/);
+
+  const remove = app.match(/remove\.onclick=\(\)=>\{cart\.splice\(i,1\);[^\n]*\}/)?.[0] ?? '';
+  assert.match(remove, /byId\('result'\)\.textContent='Removed '\+kind\.toLowerCase\(\)\+' "'\+x\.name\+'" from demo cart\./);
+  assert.match(remove, /No order was placed\./);
+
+  const preview = app.match(/byId\('preview'\)\.onclick=(\(\)=>\{[^\n]*\});/)?.[1] ?? '';
+  assert.match(preview, /byId\('result'\)\.textContent=/);
+  assert.match(preview, /No payment or order submission occurred/);
+  assert.doesNotMatch(preview, /\.focus\(/);
+
+  const review = app.match(/function reviewDemoCart\(\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(review, /show\('cart'\)/);
+  assert.doesNotMatch(review, /\.focus\(/, 'Review keeps the existing checkout heading handoff and does not move focus again');
+  let visits = 0;
+  const result = { textContent: '' };
+  const runReview = cart => {
+    visits = 0;
+    new Script('(' + review + ')').runInNewContext({
+      cart,
+      show: tab => { visits += tab === 'cart' ? 1 : 0; },
+      byId: id => id === 'result' ? result : null
+    })();
+  };
+  runReview([{ id: 'r1' }]);
+  assert.equal(visits, 1);
+  assert.equal(result.textContent, 'Reviewing demo cart: 1 demo item. This is an order preview only. No payment, reservation or order submission occurred.');
+  runReview([{ id: 'r1' }, { id: 's1' }]);
+  assert.equal(result.textContent, 'Reviewing demo cart: 2 demo items. This is an order preview only. No payment, reservation or order submission occurred.');
+
+  const save = app.match(/function addDemoRobot\(name,brand,model\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(save, /byId\('robotMessage'\)\.textContent=/);
+  assert.match(save, /Compatibility not verified; no device connected\./);
+  assert.doesNotMatch(save, /\.focus\(/);
+
+  const profileRemove = app.match(/remove\.onclick=\(\)=>\{if\(!window\.confirm\([^\n]*\}/)?.[0] ?? '';
+  assert.match(profileRemove, /byId\('robotMessage'\)\.textContent=saved\?'Demo profile removed from this browser\.'/);
+  assert.match(profileRemove, /no device connected|removed from this browser/i);
+
+  const nickname = app.match(/byId\('name'\)\.addEventListener\('input',(\(\)=>\{[^\n]*\})\);/)?.[1] ?? '';
+  assert.match(nickname, /Name changed\. Preview again to continue\. No order was placed\./);
+  assert.doesNotMatch(nickname, /\.focus\(/);
+  const clearName = app.match(/byId\('clearPreviewName'\)\.onclick=(\(\)=>\{[^\n]*\});/)?.[1] ?? '';
+  assert.match(clearName, /Name cleared\. Preview again to continue\. No order or personal details were submitted\./);
+  assert.match(clearName, /Preview name cleared\. This is an on-page demo preview; no order or personal details are submitted\./);
+  assert.match(clearName, /byId\('name'\)\.focus\(\)/);
+  assert.doesNotMatch(clearName, /show\(/);
+
+  const skillsChange = app.match(/byId\('skillRobotSelect'\)\.addEventListener\('change',(e=>\{[^\n]*\})\);/)?.[1] ?? '';
+  assert.match(skillsChange, /updateSkillsRobotSummary\(\)/);
+  assert.doesNotMatch(skillsChange, /\.focus\(|show\(/);
+  const skillsSummary = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(skillsSummary, /byId\('skillsRobotSummary'\)\.textContent=/);
+  assert.match(skillsSummary, /Compatibility has not been checked; installation is unavailable\./);
+  assert.doesNotMatch(page, /id="skillcards"[^>]*aria-live/);
 });
 
 test('Escape clears checkout nickname, blocks stale preview handoff and preserves other keys', () => {
@@ -1415,11 +1509,19 @@ test('My Robots opens generic Services with the chosen demo profile, without com
 
 test('Services offers a demo cart review route only when items exist', () => {
   assert.match(page, /id="reviewServicesCart" hidden>Review demo cart/);
-  const source = app.match(/byId\('reviewServicesCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.match(app, /byId\('reviewServicesCart'\)\.onclick=reviewDemoCart/);
+  const source = app.match(/function reviewDemoCart\(\)\{[^\n]*\}/);
   assert.ok(source, 'Expected Services-to-Checkout handler');
   let destination;
-  new Script('(' + source[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  const result = { textContent: '' };
+  new Script('(' + source[0] + ')').runInNewContext({
+    cart: [{ id: 's1' }],
+    show: tab => { destination = tab; },
+    byId: id => id === 'result' ? result : null
+  })();
   assert.equal(destination, 'cart');
+  assert.match(result.textContent, /Reviewing demo cart: 1 demo item\./);
+  assert.match(result.textContent, /No payment, reservation or order submission occurred/);
   assert.match(app, /byId\('reviewServicesCart'\)\.hidden=!cart\.length/);
   assert.match(page, /No bookings, service requests or payments are available/);
 });
@@ -1565,10 +1667,15 @@ test('Discover concept actions and Services demo add buttons have distinct acces
 
 test('Discover offers a synchronized demo cart review shortcut without real checkout', () => {
   assert.match(page, /id="reviewDiscoverCart" hidden>Review demo cart/);
-  const handler = app.match(/byId\('reviewDiscoverCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.match(app, /byId\('reviewDiscoverCart'\)\.onclick=reviewDemoCart/);
+  const handler = app.match(/function reviewDemoCart\(\)\{[^\n]*\}/);
   assert.ok(handler, 'Expected Discover-to-Checkout handler');
   let destination;
-  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  new Script('(' + handler[0] + ')').runInNewContext({
+    cart: [{ id: 'r1' }, { id: 's1' }],
+    show: tab => { destination = tab; },
+    byId: () => ({ textContent: '' })
+  })();
   assert.equal(destination, 'cart');
 
   const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
@@ -1659,10 +1766,15 @@ test('Discover and Services mark already-added demo items without duplicating ch
 
 test('My Robots offers a synchronized demo cart review shortcut without real checkout', () => {
   assert.match(page, /id="reviewRobotsCart" hidden>Review demo cart/);
-  const handler = app.match(/byId\('reviewRobotsCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=reviewDemoCart/);
+  const handler = app.match(/function reviewDemoCart\(\)\{[^\n]*\}/);
   assert.ok(handler, 'Expected My Robots-to-Checkout handler');
   let destination;
-  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  new Script('(' + handler[0] + ')').runInNewContext({
+    cart: [{ id: 'r1' }],
+    show: tab => { destination = tab; },
+    byId: () => ({ textContent: '' })
+  })();
   assert.equal(destination, 'cart');
 
   const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
@@ -1703,10 +1815,15 @@ test('My Robots offers a synchronized demo cart review shortcut without real che
 
 test('Skills offers a synchronized demo cart review shortcut without real checkout', () => {
   assert.match(page, /id="reviewSkillsCart" hidden>Review demo cart/);
-  const handler = app.match(/byId\('reviewSkillsCart'\)\.onclick=(\(\)=>show\('cart'\));/);
+  assert.match(app, /byId\('reviewSkillsCart'\)\.onclick=reviewDemoCart/);
+  const handler = app.match(/function reviewDemoCart\(\)\{[^\n]*\}/);
   assert.ok(handler, 'Expected Skills-to-Checkout handler');
   let destination;
-  new Script('(' + handler[1] + ')').runInNewContext({ show: tab => { destination = tab; } })();
+  new Script('(' + handler[0] + ')').runInNewContext({
+    cart: [{ id: 'r1' }],
+    show: tab => { destination = tab; },
+    byId: () => ({ textContent: '' })
+  })();
   assert.equal(destination, 'cart');
 
   const source = app.match(/function renderCart\(\)\{[^\n]*\}/);
@@ -2477,7 +2594,7 @@ test('mobile filled My Robots keeps profile actions, handoffs, and the profile f
   assert.match(app, /clearSearch\.textContent='Clear search'/);
   assert.match(app, /compatibility not verified/);
   assert.match(app, /byId\('reviewRobotsCart'\)\.hidden=!cart\.length/);
-  assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=\(\)=>show\('cart'\)/);
+  assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=reviewDemoCart/);
   assert.doesNotMatch(robots, /payment method|place order|buy now|card number|book a service|install now/i);
 });
 
@@ -2690,7 +2807,8 @@ test('narrow filled Checkout, Skills, and Services keep nickname and review acti
   assert.match(skills, /id="reviewSkillsCart" hidden>Review demo cart →/);
   assert.match(services, /id="reviewServicesCart" hidden>Review demo cart →/);
   assert.match(app, /byId\('reviewSkillsCart'\)\.hidden=!cart\.length/);
-  assert.match(app, /byId\('reviewServicesCart'\)\.onclick=\(\)=>show\('cart'\)/);
+  assert.match(app, /byId\('reviewServicesCart'\)\.onclick=reviewDemoCart/);
+  assert.match(app, /function reviewDemoCart\(\)\{[^}]*show\('cart'\)/);
   assert.match(app, /No payment or order submission occurred/);
   assert.match(app, /this does not confirm purchase, ownership, compatibility or hardware connection/);
   assert.doesNotMatch(cart + skills + services, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i);
