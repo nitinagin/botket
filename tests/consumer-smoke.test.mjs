@@ -2292,3 +2292,21 @@ test('mobile Services keeps both recovery actions readable before the preview li
   assert.match(services, /No bookings, service requests or payments are available/);
   assert.match(services, /Generic service previews/);
 });
+
+test('mobile empty Checkout keeps both recovery actions above the fixed bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px both empty Checkout recovery actions sat under the fixed bottom nav/);
+  assert.match(mobile, /body:has\(#cart:not\(\[hidden\]\)\) header \{ padding: 8px 16px; \}/);
+  assert.match(mobile, /main:has\(#cart:not\(\[hidden\]\)\) \{ padding-top: 8px; \}/);
+  assert.match(mobile, /main:has\(#cart:not\(\[hidden\]\)\) > h1 \{ font-size: 28px; line-height: 1\.15; margin: 0 0 8px; \}/);
+  assert.match(mobile, /main:has\(#cart:not\(\[hidden\]\)\) > p \{ margin: 0 0 8px; \}/);
+  assert.match(mobile, /#cart > h2 \{ margin: 8px 0 4px; \}/);
+  assert.match(mobile, /#cart > p\.muted \{ margin: 0 0 6px; \}/);
+  assert.match(page, /#items > button\{[^}]*box-sizing:border-box;[^}]*min-height:44px/);
+  assert.match(page, /browse\.textContent=lastBrowseTab==='services'\?'Browse service previews →':'Browse demo robots →'/);
+  assert.match(page, /browse\.setAttribute\('data-cart-browse',''\);browse\.onclick=\(\)=>show\(lastBrowseTab\)/);
+  assert.match(page, /openRobots\.textContent='Open My Robots \(demo profiles\) →'/);
+  assert.match(page, /openRobots\.setAttribute\('data-cart-robots',''\);openRobots\.setAttribute\('aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'\);openRobots\.onclick=\(\)=>show\('robots'\)/);
+  assert.match(page, /This is an order preview, not a real checkout/);
+  assert.doesNotMatch(page, /payment method|place order|buy now|card number/i);
+});
