@@ -1730,7 +1730,7 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
       'preview', 'clear-preview-name', 'review-cart', 'save-profile', 'remove-profile', 'skill-select',
       'add-service', 'handoff-continue', 'handoff-browse', 'handoff-discover', 'handoff-skills',
       'handoff-services', 'handoff-manage-from-skills', 'handoff-skills-from-services', 'handoff-manage-from-services',
-      'handoff-empty-browse', 'handoff-empty-robots'
+      'handoff-empty-browse', 'handoff-empty-robots', 'skip-link', 'footer-academy'
     ];
 
     let pageOpen = false;
@@ -1771,6 +1771,21 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
         if (id === 'openRobotsFromServices') seen.add('handoff-manage-from-services');
         if (name.startsWith('Browse demo robots') || name.startsWith('Browse service previews')) seen.add('handoff-empty-browse');
         if (name.includes('Open My Robots')) seen.add('handoff-empty-robots');
+        if (String(measured.className).includes('skip-link')) seen.add('skip-link');
+        if (measured.tag === 'A' && name.includes('Academy')) seen.add('footer-academy');
+      };
+      const assertLinkFocus = measured => {
+        const where = width + 'x' + height + ' link ' + (measured.name || measured.className || measured.tag);
+        assert.equal(measured.focusVisible, true, where + ' has no :focus-visible ring');
+        assert.equal(measured.outlineStyle, 'solid', where + ' outline style is ' + measured.outlineStyle);
+        assert.ok(measured.outlineWidth >= 3, where + ' outline is ' + measured.outlineWidth + 'px');
+        assert.equal(measured.outlineOffset, 2, where + ' outline offset is ' + measured.outlineOffset);
+        assert.ok(measured.outlineContrast >= 3, where + ' focus contrast is ' + measured.outlineContrast + ' (' + measured.outlineColor + ')');
+        assert.ok(measured.width >= 44 && measured.height >= 44, where + ' tap target is ' + measured.width.toFixed(1) + 'x' + measured.height.toFixed(1));
+        assert.ok(measured.top >= -0.5, where + ' starts above the viewport at ' + measured.top.toFixed(1));
+        assert.ok(measured.bottom <= measured.navTop + 0.5, where + ' is under the bottom nav by ' + (measured.bottom - measured.navTop).toFixed(1) + 'px');
+        assert.ok(measured.ringTop >= -0.5 && measured.ringLeft >= -0.5 && measured.ringRight <= width + 0.5, where + ' focus ring leaves the viewport');
+        assert.ok(measured.ringBottom <= measured.navTop + 0.5, where + ' focus ring is under the bottom nav by ' + (measured.ringBottom - measured.navTop).toFixed(1) + 'px');
       };
       const assertFocus = measured => {
         const where = width + 'x' + height + ' ' + (measured.id || measured.name || measured.tag);
@@ -1799,7 +1814,14 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
           const measured = await evaluate(snapshot);
           if (String(measured.className).includes('skip-link')) {
             assert.ok(i > 0, width + 'x' + height + ' Tab did not leave the skip link');
+            assertLinkFocus(measured);
+            note(measured);
             return;
+          }
+          if (measured.tag === 'A') {
+            assertLinkFocus(measured);
+            note(measured);
+            continue;
           }
           if ((measured.inNav || measured.inSection) && ['BUTTON', 'INPUT', 'SELECT'].includes(measured.tag)) {
             assertFocus(measured);
@@ -1808,6 +1830,22 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
         }
         throw new Error('Tab walk did not return to the skip link at ' + width + 'x' + height);
       };
+
+      const skipHidden = await evaluate(`(() => {
+        const el = document.querySelector('.skip-link');
+        const rect = el.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, focusVisible: el.matches(':focus-visible') };
+      })()`);
+      assert.equal(skipHidden.focusVisible, false, width + 'x' + height + ' skip link is shown before keyboard focus');
+      assert.ok(skipHidden.bottom <= 0, width + 'x' + height + ' skip link is visible before focus (bottom ' + skipHidden.bottom.toFixed(1) + ')');
+      await evaluate("document.querySelector('.skip-link').focus()");
+      await sleep(40);
+      assertLinkFocus(await evaluate(snapshot));
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+      await sleep(40);
+      const skipTarget = await evaluate("document.activeElement && document.activeElement.id");
+      assert.equal(skipTarget, 'main-content', width + 'x' + height + ' skip link focused ' + skipTarget);
 
       await tabThrough();
       await evaluate("document.querySelector('[data-tab=cart]').click()");
