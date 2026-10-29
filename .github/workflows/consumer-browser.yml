@@ -1,0 +1,34 @@
+name: Consumer browser journey
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - consumer.html
+      - tests/consumer-browser.test.mjs
+      - .github/workflows/consumer-browser.yml
+  pull_request:
+    paths:
+      - consumer.html
+      - tests/consumer-browser.test.mjs
+      - .github/workflows/consumer-browser.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consumer-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Chrome is installed
+        run: command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Test full demo journey in headless mobile Chrome
+        run: node --test tests/consumer-browser.test.mjs
