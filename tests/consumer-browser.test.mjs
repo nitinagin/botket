@@ -124,8 +124,12 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#services > p.muted').textContent"), /No bookings/);
   } finally {
     cdp?.socket.close();
-    chrome?.kill();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
     await new Promise(resolve => server.close(resolve));
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
