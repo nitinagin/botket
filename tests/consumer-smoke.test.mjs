@@ -2608,6 +2608,58 @@ test('Discover concept cards name each demo concept without purchase, integratio
   assert.match(mobile, /\.grid \{ grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\); \}/);
 });
 
+test('narrow empty states keep named demo recovery actions at least 44px and scrollable clear of the bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /main \{ padding: 20px 16px 116px; \}/);
+  assert.match(mobile, /html \{ scroll-padding-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\); \}/);
+  assert.match(mobile, /body \{ padding-bottom: calc\(100px \+ env\(safe-area-inset-bottom\)\); \}/);
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /#items > button\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*max-width:100%/);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; \}/);
+  assert.doesNotMatch(page, /#items > button\{[^}]*white-space:\s*nowrap/);
+  assert.doesNotMatch(page, /\.next-step\{[^}]*white-space:\s*nowrap/);
+  assert.doesNotMatch(page, /#items > button\{[^}]*overflow(?:-x)?:\s*hidden/);
+
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart && robots && skills && services, 'Expected Checkout, My Robots, Skills, and Services');
+  assert.match(cart, /This is an order preview, not a real checkout\. No payment, reservation or order submission occurs\./);
+  assert.match(app, /empty\.textContent='Your cart is empty\. No order was placed\. Press Open My Robots \(demo profiles\)\. This does not connect a device\.'/);
+  assert.match(app, /browse\.textContent=lastBrowseTab==='services'\?'Browse service previews →':'Browse demo robots →'/);
+  assert.match(app, /openRobots\.textContent='Open My Robots \(demo profiles\) →'/);
+  assert.match(app, /openRobots\.setAttribute\('aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'\)/);
+  assert.match(robots, /does not verify ownership or connect hardware/);
+  assert.match(robots, /id="openDiscoverFromRobots">Explore robot concepts →/);
+  assert.match(robots, /id="openSkillsFromRobots">Explore skill previews →/);
+  assert.ok(robots.indexOf('id="openDiscoverFromRobots"') < robots.indexOf('id="openSkillsFromRobots"'));
+  assert.ok(robots.indexOf('id="openSkillsFromRobots"') < robots.indexOf('<form id="registerRobot"'));
+  assert.match(app, /empty\.textContent='No demo robots added yet\.'/);
+  assert.match(app, /None of these actions verifies ownership, compatibility, or connects a device\./);
+  assert.match(app, /browse\.textContent='Explore robot concepts →';browse\.onclick=\(\)=>show\('store'\)/);
+  assert.match(skills, /Compatibility is not verified, and installation is unavailable/);
+  assert.match(skills, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
+  assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
+  assert.match(services, /No bookings, service requests or payments are available/);
+  assert.match(services, /id="openSkillsFromServices">Explore generic skill previews →/);
+  assert.match(services, /id="openRobotsFromServices">Manage demo robots →/);
+  assert.match(app, /These are generic service previews, not matched to any robot\. Press Manage demo robots to add a local demo profile, or Explore generic skill previews to browse skills\. Service eligibility and compatibility are unverified; no booking is available\./);
+
+  const emptyCopy = [
+    cart, robots, skills, services,
+    "Your cart is empty. No order was placed. Press Open My Robots (demo profiles). This does not connect a device.",
+    'Browse demo robots →',
+    'Open My Robots (demo profiles) →. No order is placed and no device is connected.',
+    'No demo robots added yet.',
+    'None of these actions verifies ownership, compatibility, or connects a device.',
+    'No demo robot profiles saved. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile. Compatibility has not been checked; installation is unavailable.',
+    'These are generic service previews, not matched to any robot. Press Manage demo robots to add a local demo profile, or Explore generic skill previews to browse skills. Service eligibility and compatibility are unverified; no booking is available.'
+  ].join('\n');
+  assert.doesNotMatch(emptyCopy, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i);
+});
+
 test('section changes move focus to the heading once and do not smooth-scroll or announce it twice', () => {
   assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\)/);
   assert.doesNotMatch(app, /scrollIntoView|behavior:\s*['"]smooth['"]|scroll-behavior:\s*smooth/);
