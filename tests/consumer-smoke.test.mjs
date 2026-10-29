@@ -2310,3 +2310,36 @@ test('mobile empty Checkout keeps both recovery actions above the fixed bottom n
   assert.match(page, /This is an order preview, not a real checkout/);
   assert.doesNotMatch(page, /payment method|place order|buy now|card number/i);
 });
+
+test('mobile Skills keeps My Robots and Services actions above the fixed bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px Manage demo robots in Skills sat under the fixed bottom nav/);
+  assert.match(mobile, /body:has\(#skills:not\(\[hidden\]\)\) header \{ padding: 8px 16px; \}/);
+  assert.match(mobile, /main:has\(#skills:not\(\[hidden\]\)\) \{ padding-top: 8px; \}/);
+  assert.match(mobile, /main:has\(#skills:not\(\[hidden\]\)\) > h1 \{ font-size: 28px; line-height: 1\.15; margin: 0 0 8px; \}/);
+  assert.match(mobile, /main:has\(#skills:not\(\[hidden\]\)\) > p \{ margin: 0 0 8px; \}/);
+  assert.match(mobile, /#skills > h2 \{ margin: 8px 0 4px; \}/);
+  assert.match(mobile, /#skills > p\.muted \{ margin: 0 0 6px; \}/);
+  assert.match(mobile, /#skills > p:has\(\.next-step\) \{ display: grid; gap: 8px; margin: 6px 0; \}/);
+  assert.match(mobile, /#skills \.next-step \{ width: 100%; \}/);
+  assert.match(mobile, /#skills > \.card \{ padding: 12px 14px; \}/);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; \}/);
+  assert.match(page, /\.next-step\{[^}]*min-height:44px;[^}]*min-width:44px/);
+
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(skills, 'Expected Skills section');
+  const services = skills.indexOf('id="openServicesFromSkills"');
+  const robots = skills.indexOf('id="openRobotsFromSkills"');
+  const cards = skills.indexOf('id="skillcards"');
+  assert.ok(services > 0 && services < robots && robots < cards,
+    'Services and My Robots actions stay above the skill preview list');
+  assert.match(skills, /class="buy next-step" id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
+  assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
+  assert.equal(skills.match(/id="openRobotsFromSkills"/g).length, 1);
+  assert.match(skills, /Compatibility is not verified, and installation is unavailable/);
+  assert.match(page, /byId\('openServicesFromSkills'\)\.onclick=\(\)=>show\('services'\)/);
+  assert.match(page, /byId\('openRobotsFromSkills'\)\.onclick=\(\)=>show\('robots'\)/);
+  assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
+  assert.doesNotMatch(skills, /install now|compatible with your robot|book a service|payment/i);
+});
