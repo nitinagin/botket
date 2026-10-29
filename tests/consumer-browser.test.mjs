@@ -708,3 +708,242 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
     }
   }
 });
+
+test('empty Checkout, My Robots, Skills, and Services stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-empty-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const states = [
+      {
+        tab: 'cart',
+        label: 'empty Checkout',
+        heading: 'Demo checkout',
+        messages: [
+          ['#cart > p.muted', 'not a real checkout'],
+          ['#cartSummary', 'Demo cart is empty. No order placed.'],
+          ['#items > p', 'No order was placed']
+        ],
+        actions: [
+          ['#items [data-cart-browse]', 'Browse demo robots →', true],
+          ['#items [data-cart-robots]', 'Open My Robots (demo profiles) →. No order is placed and no device is connected.', true]
+        ]
+      },
+      {
+        tab: 'robots',
+        label: 'empty My Robots',
+        heading: 'My Robots',
+        messages: [
+          ['#robots > p.muted', 'does not verify ownership or connect hardware'],
+          ['#myrobots > p:first-of-type', 'No demo robots added yet.'],
+          ['#myrobots > p.hint', 'verifies ownership, compatibility, or connects a device']
+        ],
+        actions: [
+          ['#openDiscoverFromRobots', 'Explore robot concepts →', true],
+          ['#openSkillsFromRobots', 'Explore skill previews →', true],
+          ['#myrobots .next-step', 'Explore robot concepts →', false]
+        ]
+      },
+      {
+        tab: 'skills',
+        label: 'Skills with no demo profile',
+        heading: 'Skills',
+        messages: [
+          ['#skills > p.muted', 'installation is unavailable'],
+          ['#skillsRobotSummary', 'No demo robot profiles saved']
+        ],
+        actions: [
+          ['#openServicesFromSkills', 'Explore service previews →', true],
+          ['#openRobotsFromSkills', 'Manage demo robots →', true]
+        ]
+      },
+      {
+        tab: 'services',
+        label: 'Services with no demo profile',
+        heading: 'Services',
+        messages: [
+          ['#services > p.muted', 'No bookings, service requests or payments are available'],
+          ['#serviceRobotContext', 'compatibility are unverified']
+        ],
+        actions: [
+          ['#openSkillsFromServices', 'Explore generic skill previews →', true],
+          ['#openRobotsFromServices', 'Manage demo robots →', true]
+        ]
+      }
+    ];
+    const forbidden = /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i;
+    const headingSelector = { cart: '#cart h2', robots: '#robots h2', skills: '#skills h2', services: '#services h2' };
+    const measure = spec => evaluate(`(() => {
+      window.scrollTo(0, 0);
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const navBox = () => document.querySelector('.tabs').getBoundingClientRect();
+      const piece = selector => {
+        const el = document.querySelector(selector);
+        if (!el || el.hidden || getComputedStyle(el).display === 'none') return null;
+        const rect = el.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const lines = [...range.getClientRects()].filter(line => line.width > 0.5 || line.height > 0.5).map(line => ({
+          left: line.left, right: line.right, top: line.top, bottom: line.bottom
+        }));
+        const parent = el.parentElement.getBoundingClientRect();
+        return {
+          text: text(el.innerText || el.textContent),
+          name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+          disabled: Boolean(el.disabled),
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          gap: navBox().top - rect.bottom,
+          scrollGap: el.scrollWidth - el.clientWidth,
+          parentLeft: parent.left,
+          parentRight: parent.right,
+          lines
+        };
+      };
+      const reach = selector => {
+        const el = document.querySelector(selector);
+        window.scrollTo(0, 0);
+        let rect = el.getBoundingClientRect();
+        let overlap = rect.bottom - navBox().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        overlap = rect.bottom - navBox().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        const bar = navBox();
+        const result = { top: rect.top, gap: bar.top - rect.bottom, scrollY: window.scrollY, width: rect.width, height: rect.height };
+        window.scrollTo(0, 0);
+        return result;
+      };
+      const spec = ${JSON.stringify({
+        heading: headingSelector[spec.tab],
+        messages: spec.messages.map(([selector]) => selector),
+        actions: spec.actions.map(([selector]) => selector)
+      })};
+      return {
+        overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+        width: window.innerWidth,
+        scrollY: window.scrollY,
+        navTop: navBox().top,
+        count: document.querySelector('#count').textContent,
+        heading: piece(spec.heading),
+        messages: spec.messages.map(piece),
+        actions: spec.actions.map(selector => ({ box: piece(selector), reached: reach(selector) }))
+      };
+    })()`);
+    const assertInside = (box, label, width) => {
+      assert.ok(box, label + ' is missing');
+      assert.ok(box.left >= -1 && box.right <= width + 1, label + ' leaves the viewport at ' + box.right.toFixed(1) + 'px');
+      assert.ok(box.left >= box.parentLeft - 1 && box.right <= box.parentRight + 1, label + ' leaves its box at ' + box.right.toFixed(1) + 'px');
+      assert.ok(box.scrollGap <= 1, label + ' clips text by ' + box.scrollGap.toFixed(1) + 'px');
+      assert.ok(box.lines.length > 0, label + ' has no text');
+      for (const line of box.lines) {
+        assert.ok(line.left >= box.left - 1 && line.right <= box.right + 1, label + ' text runs to ' + line.right.toFixed(1) + 'px');
+        assert.ok(line.top >= box.top - 1 && line.bottom <= box.top + box.height + 1, label + ' text leaves its box vertically');
+      }
+    };
+    const openWidth = async (width, height) => {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await evaluate("document.querySelector('[data-tab=store]').click()");
+      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#store").hidden === false && document.querySelector("#count").textContent === "0"'), width + ' Discover');
+      for (const spec of states) {
+        await evaluate('document.querySelector("[data-tab=' + spec.tab + ']").click()');
+        await until(() => evaluate('document.querySelector("#' + spec.tab + '").hidden === false'), spec.label);
+        await evaluate('window.scrollTo(0, 0)');
+        const layout = await measure(spec);
+        assert.equal(layout.overflow, 0, width + ' ' + spec.label + ' overflows horizontally by ' + layout.overflow + 'px');
+        assert.equal(layout.scrollY, 0, width + ' ' + spec.label + ' must be measured on first paint');
+        assert.equal(layout.width, width, spec.label + ' viewport');
+        assert.equal(layout.count, '0', spec.label + ' cart');
+        assert.equal(layout.heading.text, spec.heading, spec.label + ' heading');
+        assertInside(layout.heading, width + ' ' + spec.label + ' heading', width);
+        assert.equal(layout.messages.length, spec.messages.length, spec.label + ' messages');
+        layout.messages.forEach((message, index) => {
+          const [selector, expected] = spec.messages[index];
+          const where = width + ' ' + spec.label + ' ' + selector;
+          assert.ok(message, where + ' missing');
+          assert.ok(message.text.includes(expected), where + ' text was ' + message.text);
+          assertInside(message, where, width);
+        });
+        assert.equal(layout.actions.length, spec.actions.length, spec.label + ' actions');
+        layout.actions.forEach((action, index) => {
+          const [selector, name, firstPaintAt390] = spec.actions[index];
+          const where = width + ' ' + spec.label + ' ' + selector;
+          assert.ok(action.box, where + ' missing');
+          assert.equal(action.box.disabled, false, where + ' is disabled');
+          assert.equal(action.box.name, name, where + ' accessible name');
+          assertInside(action.box, where, width);
+          assert.ok(action.box.width >= 44 && action.box.height >= 44, where + ' tap target is ' + action.box.width.toFixed(1) + 'x' + action.box.height.toFixed(1));
+          const onFirstPaint = action.box.top >= 0 && action.box.gap >= 0;
+          const reached = action.reached.top >= 0 && action.reached.gap >= 0 && action.reached.width >= 44 && action.reached.height >= 44;
+          assert.ok(onFirstPaint || reached, where + ' is not above the bottom nav on first paint (gap ' + action.box.gap.toFixed(1) + 'px) or after scrolling (gap ' + action.reached.gap.toFixed(1) + 'px, top ' + action.reached.top.toFixed(1) + 'px)');
+          if (width === 390 && firstPaintAt390) {
+            assert.ok(onFirstPaint, where + ' regressed below the bottom nav at 390px by ' + (-action.box.gap).toFixed(1) + 'px');
+          }
+        });
+        const copy = [layout.heading.text, ...layout.messages.map(message => message.text), ...layout.actions.map(action => action.box.name)].join(' ');
+        assert.doesNotMatch(copy, forbidden, spec.label + ' implies a real purchase, connection, or verified compatibility');
+        await evaluate("document.querySelector('[data-tab=store]').click()");
+        await until(() => evaluate('document.querySelector("#store").hidden === false'), 'Discover between empty states');
+      }
+    };
+
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelector('#products [data-add]') !== null && document.querySelector('#count').textContent === '0'"), 'Discover ready with an empty demo cart');
+    await openWidth(320, 640);
+    await openWidth(390, 844);
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});
