@@ -1169,7 +1169,7 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 p
 
       await evaluate("document.querySelector('#products [data-add]').click()");
       await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '1'"), 'one demo robot in checkout');
-      await audit(at('checkout-1'), {
+      const checkoutOne = await audit(at('checkout-1'), {
         section: 'cart',
         heading: 'Demo checkout',
         minControls: 5,
@@ -1238,6 +1238,41 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 p
       });
       assert.ok(services.controls.some(control => control.id === 'reviewServicesCart' && control.height >= 44 && control.name.includes('Review demo cart')), 'Services review action is below 44px');
       assert.equal(services.controls.filter(control => control.name.includes('no booking') && !control.disabled).length, 2, 'Both demo service actions should stay available');
+      const order = await evaluate(`(() => {
+        const preview = document.querySelector('#preview');
+        const hint = document.querySelector('#previewNameHint');
+        const button = document.querySelector('#servicecards .preview-list-card button');
+        const detail = button.closest('article').querySelector('p.muted');
+        const following = Node.DOCUMENT_POSITION_FOLLOWING;
+        return {
+          previewAfterHint: Boolean(hint.compareDocumentPosition(preview) & following),
+          buttonAfterDetail: Boolean(detail.compareDocumentPosition(button) & following),
+          narrowClass: document.querySelector('#cart > .card').classList.contains('narrow-preview-first'),
+          hint: hint.textContent,
+          detail: detail.textContent,
+          context: document.querySelector('#serviceRobotContext').textContent
+        };
+      })()`);
+      assert.match(order.hint, /use a nickname rather than your real name/);
+      assert.match(order.hint, /no order or personal details are submitted/);
+      assert.match(order.detail, /no technician is assigned or appointment booked/);
+      assert.match(order.context, /eligibility and compatibility are unverified/);
+      assert.match(order.context, /no booking is available/);
+      const previewControl = checkoutOne.controls.find(control => control.id === 'preview');
+      const addService = services.controls.find(control => control.name.includes('Add Robot Setup'));
+      if (width === 390) {
+        assert.equal(order.previewAfterHint, true, '390px moved Preview order ahead of the nickname hint');
+        assert.equal(order.buttonAfterDetail, true, '390px moved Add demo service ahead of the service detail');
+        assert.equal(order.narrowClass, false, '390px applied the narrow checkout layout');
+        assert.ok(previewControl.gap < 0 && previewControl.reached.gap >= -1, '390px Preview order must remain reachable below the fold; gap ' + previewControl.gap.toFixed(1));
+        assert.ok(previewControl.width < 160 && previewControl.height >= 44, '390px Preview order size changed to ' + previewControl.width.toFixed(1) + 'x' + previewControl.height.toFixed(1));
+        assert.ok(addService.gap < 0 && addService.reached.gap >= -1, '390px Add demo service must remain reachable below the fold; gap ' + addService.gap.toFixed(1));
+        assert.ok(addService.width < 180 && addService.height >= 44, '390px Add demo service size changed to ' + addService.width.toFixed(1) + 'x' + addService.height.toFixed(1));
+      } else {
+        assert.equal(order.previewAfterHint, false, '320px left Preview order after the nickname hint');
+        assert.equal(order.buttonAfterDetail, false, '320px left Add demo service after the service detail');
+        assert.equal(order.narrowClass, true, '320px did not mark the filled checkout card');
+      }
     };
 
     await runJourney(320, 640);
@@ -1305,7 +1340,7 @@ test('320px section handoffs start at the heading and keep the next demo action 
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
     await until(() => evaluate("document.querySelector('#products [data-add]') !== null && window.innerWidth === 320 && matchMedia('(prefers-reduced-motion: reduce)').matches"), 'Discover ready at 320px');
 
-    const handoff = async (selector, destination, label, visible, reachable = []) => {
+    const handoff = async (selector, destination, label, visible, reachable = [], arrival = []) => {
       const measured = await evaluate(`(() => {
         const text = value => (value || '').replace(/\\s+/g, ' ').trim();
         const nameOf = el => text(el.getAttribute('aria-label') || el.innerText || el.textContent);
@@ -1361,6 +1396,7 @@ test('320px section handoffs start at the heading and keep the next demo action 
           focusVisible: active.matches(':focus-visible'),
           overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
           visible: ${JSON.stringify(visible)}.map(item => describe(document.querySelector(item))),
+          arrival: ${JSON.stringify(arrival)}.map(item => describe(document.querySelector(item))),
           reached: ${JSON.stringify(reachable)}.map(reach),
           navButtons: [...document.querySelectorAll('.tabs button')].map(describe)
         };
@@ -1384,6 +1420,7 @@ test('320px section handoffs start at the heading and keep the next demo action 
           assert.ok(line.left >= action.left - 1 && line.right <= action.right + 1, where + ' text runs to ' + line.right.toFixed(1));
         }
       };
+      assert.equal(measured.arrival.length, arrival.length, label + ' arrival actions');
       assert.equal(measured.visible.length, visible.length, label + ' visible actions');
       measured.visible.forEach((action, index) => assertAction(action, label + ' ' + visible[index]));
       assert.equal(measured.reached.length, reachable.length, label + ' reachable actions');
@@ -1425,19 +1462,37 @@ test('320px section handoffs start at the heading and keep the next demo action 
     assert.equal(landing.visible[0].name, 'Explore service previews →');
     assert.equal(landing.visible[1].name, 'Manage demo robots →');
 
-    landing = await handoff('[data-tab=services]', 'services', 'Bottom nav Skills to Services', serviceHandoffs, ['#servicecards [data-add]']);
+    landing = await handoff('[data-tab=services]', 'services', 'Bottom nav Skills to Services', serviceHandoffs, ['#servicecards [data-add]'], ['#servicecards [data-add]', '#services > p.muted', '#serviceRobotContext', '#servicecards p.muted']);
     assert.equal(landing.visible[0].name, 'Explore generic skill previews →');
     assert.equal(landing.visible[1].name, 'Manage demo robots →');
     assert.equal(landing.reached[0].name, 'Add Robot Setup service preview to demo cart (no booking)');
+    assert.equal(landing.arrival[0].name, 'Add Robot Setup service preview to demo cart (no booking)');
+    assert.ok(landing.arrival[0].top >= -0.5 && landing.arrival[0].gap >= -0.5, 'Add demo service is below the first 320x640 screen by ' + (-landing.arrival[0].gap).toFixed(1) + 'px');
+    assert.ok(landing.arrival[0].height >= 44 && landing.arrival[0].width >= 44, 'Add demo service tap target is ' + landing.arrival[0].width.toFixed(1) + 'x' + landing.arrival[0].height.toFixed(1));
+    assert.ok(landing.arrival[1].top >= -0.5 && landing.arrival[1].gap >= -0.5, 'Services demo disclaimer is not fully above the bottom nav');
+    assert.match(landing.arrival[1].name, /No bookings, service requests or payments are available/);
+    assert.ok(landing.arrival[2].top >= -0.5 && landing.arrival[2].gap >= -0.5, 'Service preview note is not fully above the bottom nav');
+    assert.match(landing.arrival[2].name, /eligibility and compatibility are unverified/);
+    assert.match(landing.arrival[2].name, /no booking is available/);
+    assert.match(landing.arrival[3].name, /no technician is assigned or appointment booked/);
+    assert.ok(landing.arrival[3].height >= 48, 'Per-service detail was shortened to ' + landing.arrival[3].height.toFixed(1) + 'px');
 
     landing = await handoff('[data-tab=store]', 'store', 'Bottom nav Services to Discover', discoverHandoffs);
     assert.equal(landing.visible[0].name, 'Add Home Robot Concept to demo cart (preview only)');
     assert.equal(landing.visible[1].name, 'Create local demo profile for Home Robot Concept (ownership and compatibility not verified)');
 
-    landing = await handoff('#products [data-add]', 'cart', 'Discover add to Checkout', ['#items [data-cart-remove]', '#browseFromCheckout'], ['#preview']);
+    landing = await handoff('#products [data-add]', 'cart', 'Discover add to Checkout', ['#items [data-cart-remove]', '#browseFromCheckout'], ['#preview'], ['#preview', '#cart > p.muted', '#previewNameHint']);
     assert.equal(landing.visible[0].name, 'Remove robot concept Home Robot Concept from demo cart');
     assert.equal(landing.visible[1].name, 'Continue browsing robot concepts →');
     assert.equal(landing.reached[0].name, 'Preview order');
+    assert.equal(landing.arrival[0].name, 'Preview order');
+    assert.ok(landing.arrival[0].top >= -0.5 && landing.arrival[0].gap >= -0.5, 'Preview order is below the first 320x640 screen by ' + (-landing.arrival[0].gap).toFixed(1) + 'px');
+    assert.ok(landing.arrival[0].height >= 44 && landing.arrival[0].width >= 44, 'Preview order tap target is ' + landing.arrival[0].width.toFixed(1) + 'x' + landing.arrival[0].height.toFixed(1));
+    assert.ok(landing.arrival[1].top >= -0.5 && landing.arrival[1].gap >= -0.5, 'Checkout demo disclaimer is not fully above the bottom nav');
+    assert.match(landing.arrival[1].name, /This is an order preview, not a real checkout\. No payment, reservation or order submission occurs\./);
+    assert.match(landing.arrival[2].name, /use a nickname rather than your real name/);
+    assert.match(landing.arrival[2].name, /no order or personal details are submitted/);
+    assert.ok(landing.arrival[2].height >= 80, 'Checkout nickname hint was shortened to ' + landing.arrival[2].height.toFixed(1) + 'px');
 
     await evaluate("document.querySelector('#preview').click()");
     landing = await handoff('#checkoutToRobots', 'robots', 'Checkout continue to My Robots', robotHandoffs);

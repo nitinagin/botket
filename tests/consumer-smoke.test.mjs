@@ -2734,3 +2734,123 @@ test('section changes move focus to the heading once and do not smooth-scroll or
     assert.doesNotMatch(section.slice(0, section.indexOf('<h2')), /aria-live|role="status"|role="alert"/);
   }
 });
+
+test('narrow phones put primary demo actions ahead of long explanations without dropping demo wording', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  const narrowBlocks = [...mobile.matchAll(/@media \(max-width: 359px\) \{([\s\S]*?)\n  \}/g)].map(match => match[1]);
+  assert.equal(narrowBlocks.length, 2, 'Expected the Discover tightening block and the primary-action block');
+  assert.match(narrowBlocks[1], /#services #serviceRobotContext \{ margin: 0; padding: 4px 8px; line-height: 1\.25; \}/);
+  assert.match(narrowBlocks[1], /#cart > \.card\.narrow-preview-first > p:has\(#preview\) \{ margin: 8px 0 0; \}/);
+  assert.doesNotMatch(mobile.slice(0, mobile.indexOf('@media (max-width: 359px)')), /narrow-preview-first|line-height: 1\.25/);
+  assert.match(mobile, /#services > \.grid \{ margin-top: 8px; \}/);
+  assert.match(mobile, /#services #serviceRobotContext \{ margin: 4px 0; padding: 8px 10px; \}/);
+
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart.indexOf('id="previewNameHint"') < cart.indexOf('id="preview"'), 'Source order keeps the nickname hint before Preview order');
+  assert.match(cart, /This is an order preview, not a real checkout\. No payment, reservation or order submission occurs\./);
+  assert.match(cart, /Leave blank to preview as Guest, or use a nickname rather than your real name\. This is an on-page demo preview; no order or personal details are submitted\./);
+  assert.match(app, /aria-label="Add '\+x\.name\+' service preview to demo cart \(no booking\)">Add demo service/);
+  assert.match(app, /<p class="muted">'\+x\.detail\+'<\/p><button/);
+  assert.match(page, /No bookings, service requests or payments are available/);
+  assert.match(app, /Service eligibility and compatibility are unverified; no booking is available/);
+  assert.match(app, /no technician is assigned or appointment booked/);
+  assert.doesNotMatch(page, /buy now|place order|payment method|card number|connect your robot|verified compatible|book a service/i);
+
+  const source = app.match(/function placeNarrowPrimaryActions\(\)\{[^\n]*\}/)?.[0];
+  assert.ok(source, 'Expected the narrow primary-action placement');
+  assert.match(app, /if\(typeof placeNarrowPrimaryActions==='function'\)placeNarrowPrimaryActions\(\)/);
+  assert.match(source, /matchMedia\('\(max-width: 359px\)'\)/);
+
+  const make = (tag, attrs = {}) => {
+    const node = { tag, id: attrs.id || '', children: [], parentElement: null, className: attrs.className || '' };
+    node.classList = {
+      toggle(name, force) {
+        const names = new Set(node.className.split(/\s+/).filter(Boolean));
+        const next = force === undefined ? !names.has(name) : Boolean(force);
+        if (next) names.add(name); else names.delete(name);
+        node.className = [...names].join(' ');
+        return next;
+      },
+      contains(name) { return node.className.split(/\s+/).includes(name); }
+    };
+    node.after = other => {
+      const from = other.parentElement;
+      if (from) from.children.splice(from.children.indexOf(other), 1);
+      const siblings = node.parentElement.children;
+      siblings.splice(siblings.indexOf(node) + 1, 0, other);
+      other.parentElement = node.parentElement;
+    };
+    node.querySelectorAll = selector => {
+      const all = [];
+      const walk = current => { all.push(current); current.children.forEach(walk); };
+      walk(node);
+      return all.filter(current => current !== node && matches(current, selector));
+    };
+    node.querySelector = selector => node.querySelectorAll(selector)[0] || null;
+    return node;
+  };
+  const matches = (node, selector) => {
+    if (selector === 'button') return node.tag === 'button';
+    if (selector === 'p.muted') return node.tag === 'p' && node.classList.contains('muted');
+    if (selector === 'p:not(.muted)') return node.tag === 'p' && !node.classList.contains('muted');
+    if (selector === '.cart-actions') return node.classList.contains('cart-actions');
+    return false;
+  };
+  const append = (parent, child) => { parent.children.push(child); child.parentElement = parent; return child; };
+  const checkout = make('section', { id: 'cart' });
+  const card = append(checkout, make('div', { className: 'card' }));
+  const actions = append(card, make('div', { className: 'cart-actions' }));
+  const label = append(card, make('label'));
+  const hint = append(card, make('p', { id: 'previewNameHint' }));
+  hint.textContent = 'Leave blank to preview as Guest, or use a nickname rather than your real name. This is an on-page demo preview; no order or personal details are submitted.';
+  const previewP = append(card, make('p'));
+  const preview = append(previewP, make('button', { id: 'preview' }));
+  const services = make('div', { id: 'servicecards' });
+  const serviceCard = append(services, make('article', { className: 'card preview-list-card' }));
+  append(serviceCard, make('h3'));
+  append(serviceCard, make('p'));
+  const detail = append(serviceCard, make('p', { className: 'muted' }));
+  detail.textContent = 'Illustrative setup guidance concept; no technician is assigned or appointment booked.';
+  const button = append(serviceCard, make('button'));
+  let narrow = false;
+  const context = {
+    cart: [],
+    byId: id => id === 'preview' ? preview : id === 'previewNameHint' ? hint : null,
+    matchMedia: () => ({ matches: narrow }),
+    document: {
+      querySelector(selector) {
+        return selector === '#cart > .card' ? card : null;
+      },
+      querySelectorAll(selector) {
+        return selector === '#servicecards .preview-list-card' ? [serviceCard] : [];
+      }
+    }
+  };
+  const place = new Script('(' + source + ')').runInNewContext(context);
+  const ids = () => card.children.map(child => child.id || child.className || child.tag);
+  const serviceOrder = () => serviceCard.children.map(child => child.tag + (child.className ? '.' + child.className : ''));
+  place();
+  assert.deepEqual(ids(), ['cart-actions', 'label', 'previewNameHint', 'p'], 'A wide empty cart keeps Preview order after the hint');
+  assert.deepEqual(serviceOrder(), ['h3', 'p', 'p.muted', 'button'], 'A wide Services card keeps the detail before the action');
+  assert.equal(card.classList.contains('narrow-preview-first'), false);
+  narrow = true;
+  place();
+  assert.deepEqual(ids(), ['cart-actions', 'label', 'previewNameHint', 'p'], 'An empty narrow cart does not move Preview order');
+  assert.deepEqual(serviceOrder(), ['h3', 'p', 'button', 'p.muted'], 'A narrow Services card puts Add demo service before the detail');
+  assert.equal(card.classList.contains('narrow-preview-first'), false);
+  context.cart = [{ id: 'r1' }];
+  place();
+  assert.deepEqual(ids(), ['cart-actions', 'p', 'label', 'previewNameHint'], 'A filled narrow cart puts Preview order before the nickname explanation');
+  assert.equal(preview.parentElement, previewP);
+  assert.equal(card.classList.contains('narrow-preview-first'), true);
+  assert.equal(hint.textContent, 'Leave blank to preview as Guest, or use a nickname rather than your real name. This is an on-page demo preview; no order or personal details are submitted.');
+  assert.equal(detail.textContent, 'Illustrative setup guidance concept; no technician is assigned or appointment booked.');
+  narrow = false;
+  place();
+  assert.deepEqual(ids(), ['cart-actions', 'label', 'previewNameHint', 'p'], 'Leaving the narrow width restores Preview order');
+  assert.deepEqual(serviceOrder(), ['h3', 'p', 'p.muted', 'button'], 'Leaving the narrow width restores the service detail');
+  assert.equal(card.classList.contains('narrow-preview-first'), false);
+  assert.equal(actions.className, 'cart-actions');
+  assert.equal(label.tag, 'label');
+  assert.equal(button.tag, 'button');
+});
