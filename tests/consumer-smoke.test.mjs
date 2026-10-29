@@ -3064,3 +3064,33 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   assert.match(elements.skillsRobotSummary.textContent, /Compatibility has not been checked; installation is unavailable\./);
   assert.equal(elements.skillRobotSelect.disabled, false);
 });
+
+test('reduced motion keeps section jumps, the skip link, cards, buttons, and status text free of animation', () => {
+  const style = page.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+  assert.ok(style.includes('.skip-link{'), 'Expected the consumer stylesheet');
+  assert.doesNotMatch(page, /scroll-behavior\s*:/);
+  assert.doesNotMatch(page, /@keyframes\b/);
+  assert.doesNotMatch(page, /(?:^|[;{\s])(?:animation|transition)(?:-[a-z-]+)?\s*:/);
+  assert.doesNotMatch(app, /scrollIntoView|scroll-behavior\s*:\s*smooth|behavior\s*:\s*['"]smooth['"]|requestAnimationFrame|\.animate\s*\(/);
+
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.equal([...show.matchAll(/heading\.focus\(\{preventScroll:true\}\)/g)].length, 1);
+  assert.match(show, /window\.scrollTo\(0,Math\.max\(0,Math\.floor\(rect\.top\+window\.scrollY\)\)\)/);
+  assert.doesNotMatch(show, /\{behavior\s*:|scrollIntoView/);
+  assert.match(app, /\.querySelectorAll\('\[data-tab\]'\)\.forEach\(b=>b\.onclick=\(\)=>show\(b\.dataset\.tab,true\)\)/);
+  assert.match(app, /if\(!robotCount\)\{show\('services'\);/);
+  assert.match(app, /show\('robots'\);byId\('robotMessage'\)/);
+  assert.match(app, /byId\('openSkillsFromRobots'\)\.onclick=\(\)=>show\('skills'\)/);
+  assert.match(app, /byId\('openServicesFromSkills'\)\.onclick=\(\)=>show\('services'\)/);
+  assert.match(app, /cart\.push\(x\);show\('cart'\)/);
+
+  assert.match(page, /\.skip-link\{[^}]*position:absolute;[^}]*top:-80px;[^}]*\}/);
+  assert.match(page, /\.skip-link:focus-visible\{top:12px\}/);
+  assert.doesNotMatch(page, /\.skip-link[^{]*\{[^}]*(?:transition|animation)\s*:/);
+  assert.match(page, /id="result" role="status" aria-live="polite"/);
+  assert.match(page, /id="robotMessage" role="status"/);
+  assert.match(app, /badge\.className='status'/);
+  assert.doesNotMatch(style, /\.card[^{]*\{[^}]*(?:transition|animation)\s*:/);
+  assert.doesNotMatch(style, /\.status[^{]*\{[^}]*(?:transition|animation)\s*:/);
+  assert.doesNotMatch(style, /button[^{]*\{[^}]*(?:transition|animation)\s*:/);
+});
