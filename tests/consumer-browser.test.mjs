@@ -1506,6 +1506,40 @@ test('320px section handoffs start at the heading and keep the next demo action 
     assert.equal(landing.visible[0].name, 'Explore generic skill previews →');
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /compatibility are unverified/i);
 
+    await evaluate(`(() => {
+      document.querySelector('[data-tab=robots]').click();
+      document.querySelector('#robotNickname').value = 'Home helper';
+      document.querySelector('#robotBrand').value = 'Example Robotics';
+      document.querySelector('#robotModel').value = 'Model A';
+      document.querySelector('#registerRobot').requestSubmit();
+      document.querySelector('[data-tab=cart]').click();
+      document.querySelector('#preview').click();
+    })()`);
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /1 of 30/, 'Filled My Robots handoff needs a saved demo profile');
+    landing = await handoff('#checkoutToRobots', 'robots', 'Filled Checkout continue to My Robots', ['#openSkillsFromRobots'], [], ['#openSkillsFromRobots', '#robots > p.muted']);
+    assert.equal(await evaluate("document.querySelector('#openDiscoverFromRobots').hidden"), true, 'Filled My Robots hides the empty Discover route');
+    assert.equal(landing.visible[0].name, 'Explore skill previews →');
+    assert.equal(landing.arrival[0].name, 'Explore skill previews →');
+    assert.ok(landing.arrival[0].top >= -0.5 && landing.arrival[0].gap >= -0.5, 'Explore skill previews is below the first 320x640 screen by ' + (-landing.arrival[0].gap).toFixed(1) + 'px');
+    assert.ok(landing.arrival[0].height >= 44 && landing.arrival[0].width >= 44, 'Explore skill previews tap target is ' + landing.arrival[0].width.toFixed(1) + 'x' + landing.arrival[0].height.toFixed(1));
+    assert.ok(landing.arrival[1].top >= -0.5 && landing.arrival[1].gap >= -0.5, 'My Robots demo disclaimer is not fully above the bottom nav');
+    assert.match(landing.arrival[1].name, /does not verify ownership or connect hardware/);
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase, ownership, compatibility or hardware connection/);
+    assert.equal(landing.overflow, 0, 'Filled My Robots overflows horizontally by ' + landing.overflow + 'px');
+
+    landing = await handoff('#openSkillsFromRobots', 'skills', 'Filled My Robots explore skill previews', skillHandoffs, [], ['#openServicesFromSkills', '#skills > p.muted', '#skillsRobotSummary']);
+    assert.equal(landing.visible[0].name, 'Explore service previews →');
+    assert.equal(landing.visible[1].name, 'Manage demo robots →');
+    assert.equal(landing.arrival[0].name, 'Explore service previews →');
+    assert.ok(landing.arrival[0].top >= -0.5 && landing.arrival[0].gap >= -0.5, 'Explore service previews is below the first 320x640 screen by ' + (-landing.arrival[0].gap).toFixed(1) + 'px');
+    assert.ok(landing.arrival[0].height >= 44 && landing.arrival[0].width >= 44, 'Explore service previews tap target is ' + landing.arrival[0].width.toFixed(1) + 'x' + landing.arrival[0].height.toFixed(1));
+    assert.ok(landing.arrival[1].top >= -0.5 && landing.arrival[1].gap >= -0.5, 'Skills demo disclaimer is not fully above the bottom nav');
+    assert.match(landing.arrival[1].name, /Compatibility is not verified, and installation is unavailable/);
+    assert.match(landing.arrival[2].name, /Home helper — Example Robotics/);
+    assert.match(landing.arrival[2].name, /Compatibility has not been checked/);
+    assert.match(landing.arrival[2].name, /installation is unavailable/);
+    assert.equal(landing.overflow, 0, 'Filled Skills overflows horizontally by ' + landing.overflow + 'px');
+
     await send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await evaluate("window.scrollTo(0, document.documentElement.scrollHeight); document.querySelector('[data-tab=store]').focus()");
     await send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32, text: ' ' });

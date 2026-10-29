@@ -2854,3 +2854,85 @@ test('narrow phones put primary demo actions ahead of long explanations without 
   assert.equal(label.tag, 'label');
   assert.equal(button.tag, 'button');
 });
+
+test('narrow filled My Robots and Skills keep the next demo handoff ahead of the long copy', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots && skills, 'Expected My Robots and Skills sections');
+
+  const robotsHandoff = robots.indexOf('id="openSkillsFromRobots"');
+  const robotsForm = robots.indexOf('<form id="registerRobot"');
+  const robotsList = robots.indexOf('id="myrobots"');
+  assert.ok(robotsHandoff > 0 && robotsHandoff < robotsForm && robotsForm < robotsList,
+    'Explore skill previews stays above the registration form and saved-profile list');
+  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.match(robots, /Saved only in this browser\. No serial numbers, warranty, ownership or compatibility verification\./);
+
+  const skillsHandoff = skills.indexOf('id="openServicesFromSkills"');
+  const skillsSummary = skills.indexOf('id="skillsRobotSummary"');
+  const skillsList = skills.indexOf('id="skillcards"');
+  assert.ok(skillsHandoff > 0 && skillsHandoff < skillsSummary && skillsSummary < skillsList,
+    'Explore service previews stays above the filled profile summary and skill preview list');
+  assert.match(skills, /<h2>Skills<\/h2><p class="muted">[^<]*Compatibility is not verified, and installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
+
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /#robots > p:has\(\.next-step\) \.next-step \{ width: 100%; \}/);
+  assert.match(mobile, /#skills \.next-step \{ width: 100%; \}/);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; \}/);
+  const narrowBlocks = [...mobile.matchAll(/@media \(max-width: 359px\) \{([\s\S]*?)\n  \}/g)].map(match => match[1]);
+  assert.equal(narrowBlocks.length, 2);
+  assert.doesNotMatch(narrowBlocks.join('\n'), /#(?:robots|skills)\b|openSkillsFromRobots|openServicesFromSkills/);
+
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(show, /robots:'openSkillsFromRobots',skills:'openServicesFromSkills'/);
+  assert.match(app, /const discoverRoute=byId\('openDiscoverFromRobots'\);if\(discoverRoute\)discoverRoute\.hidden=mine\.length>0;/);
+  assert.doesNotMatch(app, /byId\('openSkillsFromRobots'\)\.hidden|byId\('openServicesFromSkills'\)\.hidden/);
+  assert.match(app, /preview\.textContent='Browse generic skills \(demo\) →'/);
+  assert.match(app, /aria-label','Browse generic skill previews for '\+x\.name\+' — '\+x\.brand\+' · '\+x\.model\+'; compatibility not verified'/);
+  assert.match(app, /Viewing generic skill previews for local demo profile: /);
+  assert.match(app, /Compatibility has not been checked; installation is unavailable\./);
+  assert.doesNotMatch(robots + '\n' + skills, /buy now|place order|payment method|card number|connect your robot|verified compatible|install now/i);
+
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/);
+  const summarySource = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/);
+  assert.ok(source && summarySource, 'Expected filled My Robots and Skills renderers');
+  const node = () => ({
+    children: [], attributes: {}, className: '', hidden: false, disabled: false, textContent: '', value: '',
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; },
+    focus() {}
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'saveDemoProfile', 'profileCount', 'clearProfiles', 'profileSearch',
+      'clearProfileSearch', 'profileSearchSummary', 'openDiscoverFromRobots', 'openSkillsFromRobots',
+      'skillRobotSelect', 'skillsRobotSummary'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const profile = { id: 'demo-1', name: 'Home helper', brand: 'Example Robotics', model: 'Model A' };
+  const visits = [];
+  const context = {
+    mine: [profile],
+    selectedRobotId: profile.id,
+    byId: id => elements[id],
+    document: { createElement: node, activeElement: null },
+    show: tab => visits.push(tab)
+  };
+  new Script('(' + source[0] + ')').runInNewContext(context)();
+  assert.equal(elements.openDiscoverFromRobots.hidden, true, 'A saved profile hides only the empty Discover route');
+  assert.equal(elements.openSkillsFromRobots.hidden, false, 'Filled My Robots must keep Explore skill previews');
+  assert.equal(elements.myrobots.children.length, 1);
+  const card = elements.myrobots.children[0];
+  assert.equal(card.children[4].textContent, 'Browse generic skills (demo) →');
+  assert.match(card.children[4].attributes['aria-label'], /Home helper — Example Robotics · Model A/);
+  assert.match(card.children[4].attributes['aria-label'], /compatibility not verified/);
+  card.children[4].onclick();
+  assert.deepEqual(visits, ['skills']);
+
+  new Script('(' + summarySource[0] + ')').runInNewContext(context)();
+  assert.match(elements.skillsRobotSummary.textContent, /Viewing generic skill previews for local demo profile: Home helper — Example Robotics · Model A\./);
+  assert.match(elements.skillsRobotSummary.textContent, /Compatibility has not been checked; installation is unavailable\./);
+  assert.equal(elements.skillRobotSelect.disabled, false);
+});
