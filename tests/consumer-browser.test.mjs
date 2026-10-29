@@ -264,6 +264,28 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     const restoredOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     assert.equal(restoredOverflow, 0, 'Reloaded My Robots overflows horizontally by ' + restoredOverflow + 'px');
     assert.equal(await evaluate("document.querySelector('#reviewRobotsCart').hidden"), true, 'A reload must not turn the demo cart into a saved order');
+
+    // Canceling a profile deletion must preserve it; confirming must persist removal.
+    await evaluate("window.confirm = () => false; document.querySelector('#myrobots [data-remove]').click()");
+    assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Browser Test Robot/, 'Cancel keeps the saved profile');
+    await evaluate("window.confirm = () => true; document.querySelector('#myrobots [data-remove]').click()");
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^0 of 30/, 'Confirm removes the profile');
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Demo profile removed from this browser/);
+
+    // A canceled cart clear must not change the cart; confirming clears only demo state.
+    await evaluate("document.querySelector('[data-tab=store]').click(); document.querySelector('#products [data-add]').click()");
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '1');
+    await evaluate("window.confirm = () => false; document.querySelector('#clearCart').click()");
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '1', 'Cancel keeps the demo cart');
+    await evaluate("window.confirm = () => true; document.querySelector('#clearCart').click()");
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Confirm empties the demo cart');
+    assert.equal(await evaluate("document.querySelector('#preview').disabled"), true, 'Empty demo cart cannot preview an order');
+    assert.match(await evaluate("document.querySelector('#result').textContent"), /Cart cleared\\. No order was placed/);
+
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelector('#profileCount')?.textContent.startsWith('0 of 30')"), 'deleted demo profile stays deleted after reload');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Cleared demo cart remains ephemeral');
+
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {
