@@ -626,7 +626,10 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
     hidden: false,
     querySelector: selector => {
       if (selector !== 'h2') return null;
-      return headings[id] ??= { focus() { focusCounts[id]++; } };
+      return headings[id] ??= {
+        focus(options) { focusCounts[id]++; this.focusOptions = options; },
+        getBoundingClientRect() { return { top: -80.2, bottom: -47 }; }
+      };
     }
   }]));
   const tabs = ids.map(id => {
@@ -643,10 +646,15 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
     lastBrowseTab: 'store',
     document: {
       activeElement: { closest: () => ({ id: 'robots' }) },
-      querySelectorAll: selector => selector === '[data-tab]' ? tabs : []
+      querySelectorAll: selector => selector === '[data-tab]' ? tabs : [],
+      querySelector(selector) {
+        if (selector === '.tabs') return { getBoundingClientRect() { return { top: 600 }; } };
+        return null;
+      }
     },
     byId: id => sections[id],
-    render: () => { renders++; }
+    render: () => { renders++; },
+    window: { scrollY: 500, scrollTo(x, y) { context.scrolled = [x, y]; } }
   };
   const show = new Script('(' + source[0] + ')').runInNewContext(context);
   const checkVisible = expected => {
@@ -675,7 +683,10 @@ test('section navigation and Skills ↔ Services handoffs keep demo routes acces
   assert.equal(focusCounts.store, 1, 'Explicit tab navigation focuses the heading');
   assert.equal(headings.store.tabIndex, -1);
   assert.equal(renders, 4, 'Each navigation rerenders the active demo state');
-  assert.equal([...source[0].matchAll(/heading\.focus\(\)/g)].length, 1, 'A section change focuses its heading once');
+  assert.equal([...source[0].matchAll(/heading\.focus\(\{preventScroll:true\}\)/g)].length, 1, 'A section change focuses its heading once without the browser centering it');
+  assert.equal(headings.store.focusOptions.preventScroll, true);
+  assert.deepEqual(context.scrolled, [0, 419], 'An off-screen destination heading is aligned to the top of the viewport');
+  assert.doesNotMatch(source[0], /scrollIntoView|behavior:\s*['"]smooth['"]/);
 
   for (const [id, expected] of [
     ['openDiscoverFromRobots', 'store'],
@@ -2685,12 +2696,35 @@ test('narrow filled Checkout, Skills, and Services keep nickname and review acti
   assert.doesNotMatch(cart + skills + services, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i);
 });
 
+test('narrow phone handoffs align the destination heading to the top of the viewport', () => {
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(show, /heading\.focus\(\{preventScroll:true\}\)/);
+  assert.match(show, /if\(rect\.top<0\|\|rect\.bottom>nav\|\|box&&\(box\.top<0\|\|box\.bottom>nav\)\)window\.scrollTo\(0,Math\.max\(0,Math\.floor\(rect\.top\+window\.scrollY\)\)\)/);
+  assert.match(show, /openSkillsFromRobots/);
+  assert.doesNotMatch(show, /scrollIntoView|behavior:\s*['"]smooth['"]/);
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 320x640, with the section heading at the top, Create demo profile sat about 14px under the fixed bottom nav/);
+  assert.match(mobile, /@media \(max-width: 359px\) \{\s*#store > p\.muted \{ margin-bottom: 2px; \}\s*#store \.store-filters \{ margin-bottom: 2px; \}\s*#store > \.grid \{ margin-top: 0; \}\s*\.concept-card \{ gap: 4px; padding: 4px 12px 8px; \}\s*\}/);
+  assert.match(page, /\.concept-actions button\{[^}]*min-height:44px/);
+  assert.match(page, /\.next-step\{[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /#items > button\{[^}]*min-height:44px/);
+  assert.match(app, /aria-label="Add '\+x\.name\+' to demo cart \(preview only\)"/);
+  assert.match(app, /aria-label="Create local demo profile for '\+x\.name\+' \(ownership and compatibility not verified\)"/);
+  assert.match(page, /openRobots\.setAttribute\('aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'\)/);
+  assert.match(page, /id="openSkillsFromRobots">Explore skill previews →/);
+  assert.match(page, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(page, /id="openSkillsFromServices">Explore generic skill previews →/);
+  assert.match(page, /id="checkoutToRobots" hidden>Continue to My Robots \(demo\) →/);
+  assert.doesNotMatch(page, /buy now|place order|payment method|card number|connect your robot|verified compatible/i);
+});
+
 test('section changes move focus to the heading once and do not smooth-scroll or announce it twice', () => {
-  assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\)/);
+  assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\{preventScroll:true\}\)/);
+  assert.match(app, /window\.scrollTo\(0,Math\.max\(0,Math\.floor\(rect\.top\+window\.scrollY\)\)\)/);
   assert.doesNotMatch(app, /scrollIntoView|behavior:\s*['"]smooth['"]|scroll-behavior:\s*smooth/);
   assert.doesNotMatch(page, /scroll-behavior:\s*smooth/);
   const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
-  assert.equal([...show.matchAll(/heading\.focus\(\)/g)].length, 1);
+  assert.equal([...show.matchAll(/heading\.focus\(\{preventScroll:true\}\)/g)].length, 1);
   for (const id of ['store', 'robots', 'skills', 'services', 'cart']) {
     const section = page.match(new RegExp('<section id="' + id + '"[^>]*>[\\s\\S]*?</section>'))?.[0];
     assert.ok(section, 'Missing section ' + id);

@@ -382,7 +382,8 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
           aria: [...document.querySelectorAll('[aria-current="page"]')].map(node => node.dataset.tab),
           inLive: Boolean(heading.closest('[aria-live], [role="status"], [role="alert"]')),
           liveDuplicate: lives.some(node => node.textContent.trim() === headingText),
-          scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior
+          scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+          overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth
         };
       })()`);
       assert.notEqual(measured.missing, true, label + ' control missing: ' + selector);
@@ -393,6 +394,7 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
       assert.equal(measured.tabindex, '-1', label + ' heading is not programmatically focusable');
       assert.ok(measured.headingTop >= 0, label + ' heading is clipped above the viewport by ' + (-measured.headingTop).toFixed(1) + 'px');
       assert.ok(measured.headingBottom <= measured.navTop, label + ' heading is behind the bottom nav by ' + (measured.headingBottom - measured.navTop).toFixed(1) + 'px');
+      assert.equal(measured.overflow, 0, label + ' overflows horizontally by ' + measured.overflow + 'px');
       if (measured.headerPosition === 'fixed' || measured.headerPosition === 'sticky') {
         assert.ok(measured.headingTop >= measured.headerBottom - 0.5, label + ' heading is under the sticky header');
       }
@@ -1240,6 +1242,242 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 p
 
     await runJourney(320, 640);
     await runJourney(390, 844);
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});
+
+test('320px section handoffs start at the heading and keep the next demo action above the bottom nav', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-320-handoff-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: true });
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelector('#products [data-add]') !== null && window.innerWidth === 320 && matchMedia('(prefers-reduced-motion: reduce)').matches"), 'Discover ready at 320px');
+
+    const handoff = async (selector, destination, label, visible, reachable = []) => {
+      const measured = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const nameOf = el => text(el.getAttribute('aria-label') || el.innerText || el.textContent);
+        const navBox = () => document.querySelector('.tabs').getBoundingClientRect();
+        const describe = el => {
+          if (!el || el.hidden || getComputedStyle(el).display === 'none' || !el.getClientRects().length) return null;
+          const box = el.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = [...range.getClientRects()].filter(line => line.width > 0.5 && line.height > 0.5).map(line => ({
+            left: line.left, right: line.right, top: line.top, bottom: line.bottom
+          }));
+          return {
+            name: nameOf(el),
+            top: box.top,
+            bottom: box.bottom,
+            height: box.height,
+            width: box.width,
+            left: box.left,
+            right: box.right,
+            gap: navBox().top - box.bottom,
+            scrollGap: el.scrollWidth - el.clientWidth,
+            lines
+          };
+        };
+        const reach = selector => {
+          const el = document.querySelector(selector);
+          if (!describe(el)) return null;
+          let overlap = describe(el).bottom - navBox().top;
+          if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+          overlap = describe(el).bottom - navBox().top;
+          if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+          return describe(el);
+        };
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const beforeTop = document.querySelector('main section:not([hidden]) h2').getBoundingClientRect().top;
+        const control = document.querySelector(${JSON.stringify(selector)});
+        if (!control || control.hidden || getComputedStyle(control).display === 'none') return { missing: true };
+        control.click();
+        const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+        const heading = section.querySelector('h2');
+        const rect = heading.getBoundingClientRect();
+        const nav = navBox();
+        const active = document.activeElement;
+        return {
+          beforeTop,
+          section: section.id,
+          headingTop: rect.top,
+          headingBottom: rect.bottom,
+          navTop: nav.top,
+          scrollY: window.scrollY,
+          focused: active === heading,
+          focusVisible: active.matches(':focus-visible'),
+          overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+          visible: ${JSON.stringify(visible)}.map(item => describe(document.querySelector(item))),
+          reached: ${JSON.stringify(reachable)}.map(reach),
+          navButtons: [...document.querySelectorAll('.tabs button')].map(describe)
+        };
+      })()`);
+      assert.notEqual(measured.missing, true, label + ' control missing: ' + selector);
+      assert.ok(measured.beforeTop < 0, label + ' must start from the bottom of the previous section');
+      assert.equal(measured.section, destination, label);
+      assert.equal(measured.focused, true, label + ' did not focus the destination heading');
+      assert.equal(measured.focusVisible, false, label + ' shows a focus ring after pointer activation');
+      assert.ok(measured.headingTop >= 0 && measured.headingBottom <= measured.navTop, label + ' heading is not fully above the bottom nav');
+      assert.ok(measured.headingTop < 2 || measured.scrollY === 0, label + ' is scrolled mid-page (scroll ' + measured.scrollY + ', heading ' + measured.headingTop.toFixed(1) + 'px)');
+      assert.equal(measured.overflow, 0, label + ' overflows horizontally by ' + measured.overflow + 'px');
+      const assertAction = (action, where) => {
+        assert.ok(action, where + ' is missing');
+        assert.ok(action.name.length > 0, where + ' has no accessible name');
+        assert.ok(action.width >= 44 && action.height >= 44, where + ' is ' + action.width.toFixed(1) + 'x' + action.height.toFixed(1));
+        assert.ok(action.left >= -1 && action.right <= 321, where + ' leaves the 320px viewport at ' + action.right.toFixed(1));
+        assert.ok(action.scrollGap <= 1, where + ' clips its label by ' + action.scrollGap.toFixed(1) + 'px');
+        assert.ok(action.top >= -0.5 && action.gap >= -0.5, where + ' is not fully above the bottom nav (top ' + action.top.toFixed(1) + 'px, gap ' + action.gap.toFixed(1) + 'px)');
+        for (const line of action.lines) {
+          assert.ok(line.left >= action.left - 1 && line.right <= action.right + 1, where + ' text runs to ' + line.right.toFixed(1));
+        }
+      };
+      assert.equal(measured.visible.length, visible.length, label + ' visible actions');
+      measured.visible.forEach((action, index) => assertAction(action, label + ' ' + visible[index]));
+      assert.equal(measured.reached.length, reachable.length, label + ' reachable actions');
+      measured.reached.forEach((action, index) => assertAction(action, label + ' reached ' + reachable[index]));
+      assert.equal(measured.navButtons.length, 5, label + ' bottom nav');
+      measured.navButtons.forEach(action => {
+        const where = label + ' bottom nav ' + (action ? action.name : '');
+        assert.ok(action, where + ' is missing');
+        assert.ok(action.name.length > 0, where + ' has no accessible name');
+        assert.ok(action.width >= 44 && action.height >= 44, where + ' is ' + action.width.toFixed(1) + 'x' + action.height.toFixed(1));
+        assert.ok(action.left >= -1 && action.right <= 321 && action.top >= 0 && action.bottom <= 641, where + ' leaves the 320px viewport');
+        assert.ok(action.scrollGap <= 1, where + ' clips its label by ' + action.scrollGap.toFixed(1) + 'px');
+        for (const line of action.lines) {
+          assert.ok(line.left >= action.left - 1 && line.right <= action.right + 1, where + ' text runs to ' + line.right.toFixed(1));
+          assert.ok(line.top >= action.top - 1 && line.bottom <= action.bottom + 1, where + ' text leaves the nav button vertically');
+        }
+      });
+      const names = [...measured.visible, ...measured.reached, ...measured.navButtons].map(action => action ? action.name : '').join(' ');
+      assert.doesNotMatch(names, /buy now|place order|payment method|card number|connect your robot|verified compatible|book a service|install now/i);
+      return measured;
+    };
+
+    const checkoutRecovery = ['#items [data-cart-browse]', '#items [data-cart-robots]'];
+    const robotHandoffs = ['#openDiscoverFromRobots', '#openSkillsFromRobots'];
+    const skillHandoffs = ['#openServicesFromSkills', '#openRobotsFromSkills'];
+    const serviceHandoffs = ['#openSkillsFromServices', '#openRobotsFromServices'];
+    const discoverHandoffs = ['#products [data-add]', '#products [data-robot]'];
+
+    let landing = await handoff('[data-tab=cart]', 'cart', 'Bottom nav Discover to Checkout', checkoutRecovery, ['#preview']);
+    assert.equal(landing.visible[0].name, 'Browse demo robots →');
+    assert.equal(landing.visible[1].name, 'Open My Robots (demo profiles) →. No order is placed and no device is connected.');
+    assert.equal(landing.reached[0].name, 'Preview order');
+
+    landing = await handoff('[data-tab=robots]', 'robots', 'Bottom nav Checkout to My Robots', robotHandoffs);
+    assert.equal(landing.visible[0].name, 'Explore robot concepts →');
+    assert.equal(landing.visible[1].name, 'Explore skill previews →');
+
+    landing = await handoff('[data-tab=skills]', 'skills', 'Bottom nav My Robots to Skills', skillHandoffs);
+    assert.equal(landing.visible[0].name, 'Explore service previews →');
+    assert.equal(landing.visible[1].name, 'Manage demo robots →');
+
+    landing = await handoff('[data-tab=services]', 'services', 'Bottom nav Skills to Services', serviceHandoffs, ['#servicecards [data-add]']);
+    assert.equal(landing.visible[0].name, 'Explore generic skill previews →');
+    assert.equal(landing.visible[1].name, 'Manage demo robots →');
+    assert.equal(landing.reached[0].name, 'Add Robot Setup service preview to demo cart (no booking)');
+
+    landing = await handoff('[data-tab=store]', 'store', 'Bottom nav Services to Discover', discoverHandoffs);
+    assert.equal(landing.visible[0].name, 'Add Home Robot Concept to demo cart (preview only)');
+    assert.equal(landing.visible[1].name, 'Create local demo profile for Home Robot Concept (ownership and compatibility not verified)');
+
+    landing = await handoff('#products [data-add]', 'cart', 'Discover add to Checkout', ['#items [data-cart-remove]', '#browseFromCheckout'], ['#preview']);
+    assert.equal(landing.visible[0].name, 'Remove robot concept Home Robot Concept from demo cart');
+    assert.equal(landing.visible[1].name, 'Continue browsing robot concepts →');
+    assert.equal(landing.reached[0].name, 'Preview order');
+
+    await evaluate("document.querySelector('#preview').click()");
+    landing = await handoff('#checkoutToRobots', 'robots', 'Checkout continue to My Robots', robotHandoffs);
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase, ownership, compatibility or hardware connection/);
+    assert.equal(landing.visible[1].name, 'Explore skill previews →');
+
+    landing = await handoff('#openSkillsFromRobots', 'skills', 'My Robots explore skill previews', skillHandoffs);
+    assert.equal(landing.visible[0].name, 'Explore service previews →');
+
+    landing = await handoff('#openServicesFromSkills', 'services', 'Skills explore service previews', serviceHandoffs, ['#servicecards [data-add]']);
+    assert.equal(landing.visible[0].name, 'Explore generic skill previews →');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /compatibility are unverified/i);
+
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await evaluate("window.scrollTo(0, document.documentElement.scrollHeight); document.querySelector('[data-tab=store]').focus()");
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32, text: ' ' });
+    await send('Input.dispatchKeyEvent', { type: 'char', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32, text: ' ' });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+    await sleep(50);
+    const keyboard = await evaluate(`(() => {
+      const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+      const heading = section.querySelector('h2');
+      const rect = heading.getBoundingClientRect();
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      return {
+        section: section.id,
+        focused: document.activeElement === heading,
+        headingTop: rect.top,
+        headingBottom: rect.bottom,
+        navTop: nav.top,
+        focusVisible: document.activeElement.matches(':focus-visible'),
+        overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth
+      };
+    })()`);
+    assert.equal(keyboard.section, 'store');
+    assert.equal(keyboard.focused, true, 'Space on Discover did not focus the heading');
+    assert.equal(keyboard.focusVisible, true, 'Keyboard handoff has no visible focus indicator');
+    assert.ok(keyboard.headingTop >= 0 && keyboard.headingTop < 2, 'Keyboard heading starts ' + keyboard.headingTop.toFixed(1) + 'px below the top');
+    assert.ok(keyboard.headingBottom <= keyboard.navTop);
+    assert.equal(keyboard.overflow, 0);
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {
