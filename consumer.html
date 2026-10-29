@@ -110,6 +110,9 @@
   /* At 390px the filled Checkout Preview order and My Robots handoff buttons were 39px tall. */
   #cart #preview,
   #cart #checkoutToRobots { box-sizing: border-box; min-height: 44px; min-width: 44px; }
+  /* At 390px one robot concept in Checkout put Clear all about 1.9px under the fixed bottom nav. */
+  #cart #total { margin: 8px 0; }
+  #cart .cart-actions button { box-sizing: border-box; min-height: 44px; min-width: 44px; margin-top: 0; }
   /* At 390px Manage demo robots in Skills sat under the fixed bottom nav. */
   body:has(#skills:not([hidden])) header { padding: 8px 16px; }
   main:has(#skills:not([hidden])) { padding-top: 8px; }

@@ -2376,3 +2376,17 @@ test('mobile filled Checkout keeps preview, remove, and Discover actions at leas
   assert.match(app, /this does not confirm purchase, ownership, compatibility or hardware connection/);
   assert.doesNotMatch(cart, /payment method|place order|buy now|card number/i);
 });
+
+test('mobile one-item Checkout keeps Clear all fully above the fixed bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px one robot concept in Checkout put Clear all about 1\.9px under the fixed bottom nav/);
+  assert.match(mobile, /#cart #total \{ margin: 8px 0; \}/);
+  assert.match(mobile, /#cart \.cart-actions button \{ box-sizing: border-box; min-height: 44px; min-width: 44px; margin-top: 0; \}/);
+  assert.match(mobile, /main \{ padding: 20px 16px 116px; \}/);
+  assert.match(mobile, /body \{ padding-bottom: calc\(100px \+ env\(safe-area-inset-bottom\)\); \}/);
+  assert.match(page, /\.cart-actions button\{[^}]*min-height:44px/);
+  assert.match(page, /byId\('clearCart'\)\.textContent=cart\.length\?'Clear all '\+cart\.length\+' demo cart item'\+\(cart\.length===1\?'':'s'\):'Clear cart'/);
+  assert.match(page, /byId\('clearCart'\)\.disabled=!cart\.length/);
+  assert.match(page, /This is an order preview, not a real checkout/);
+  assert.doesNotMatch(page, /payment method|place order|buy now|card number/i);
+});
