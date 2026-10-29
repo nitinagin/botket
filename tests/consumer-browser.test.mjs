@@ -544,3 +544,167 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
     }
   }
 });
+
+test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-concepts-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const measure = `(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const cards = [...document.querySelectorAll('#products .concept-card')].map(card => {
+        const cardRect = card.getBoundingClientRect();
+        const heading = card.querySelector('h3');
+        const parts = [...card.querySelectorAll('h3, .concept-price, .concept-label, .concept-actions button')].map(el => {
+          const rect = el.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = [...range.getClientRects()]
+            .filter(line => line.width > 0.5)
+            .map(line => ({ left: line.left, right: line.right }));
+          const kind = el.matches('h3') ? 'heading'
+            : el.classList.contains('concept-price') ? 'price'
+            : el.classList.contains('concept-label') ? 'badge' : 'button';
+          return {
+            kind,
+            text: text(el.innerText),
+            aria: el.getAttribute('aria-label') || '',
+            width: rect.width,
+            height: rect.height,
+            left: rect.left,
+            right: rect.right,
+            scrollGap: el.scrollWidth - el.clientWidth,
+            lines
+          };
+        });
+        return {
+          name: text(heading ? heading.textContent : card.getAttribute('aria-label')),
+          text: text(card.innerText),
+          arias: parts.map(part => part.aria).filter(Boolean).join(' '),
+          images: [...card.querySelectorAll('img')].map(img => ({
+            alt: img.getAttribute('alt'),
+            hidden: img.getAttribute('aria-hidden'),
+            role: img.getAttribute('role')
+          })),
+          cardLeft: cardRect.left,
+          cardRight: cardRect.right,
+          parts
+        };
+      });
+      return {
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        width: window.innerWidth,
+        cards
+      };
+    })()`;
+    const names = ['Home Robot Concept', 'Companion Robot Concept', 'Educational Robotics Kit Concept'];
+    const forbidden = /buy now|purchase|place order|payment|works with|compatible with|connect your robot|verified compatibility/i;
+    const assertCards = (measured, label, firstButtons) => {
+      assert.equal(measured.overflow, 0, label + ' overflows horizontally by ' + measured.overflow + 'px');
+      assert.equal(measured.cards.length, 3, label + ' concept cards');
+      measured.cards.forEach((card, index) => {
+        const where = label + ' ' + names[index];
+        assert.equal(card.name, names[index], where + ' accessible name');
+        assert.match(card.text, /illustrative price/i, where + ' price');
+        assert.match(card.text, /concept only/i, where + ' demo label');
+        assert.match(card.text, /demo cart/i, where);
+        assert.match(card.text, /demo profile/i, where);
+        assert.match(card.arias, /preview only/i, where);
+        assert.match(card.arias, /ownership and compatibility not verified/i, where);
+        assert.doesNotMatch(card.text + ' ' + card.arias, forbidden, where);
+        assert.ok(card.cardLeft >= -1 && card.cardRight <= measured.width + 1, where + ' card reaches ' + card.cardRight.toFixed(1) + 'px');
+        for (const image of card.images) {
+          const decorative = image.alt === '' || image.hidden === 'true' || image.role === 'presentation' || image.role === 'none';
+          const meaningful = typeof image.alt === 'string' && image.alt.trim().length > 0;
+          assert.ok(decorative || meaningful, where + ' image needs alt text or must be decorative');
+        }
+        assert.deepEqual(card.parts.map(part => part.kind), ['heading', 'price', 'badge', 'button', 'button'], where + ' parts');
+        assert.equal(card.parts[3].text, firstButtons[index], where + ' primary action');
+        for (const part of card.parts) {
+          const piece = where + ' ' + part.kind + ' "' + part.text + '"';
+          assert.ok(part.left >= card.cardLeft - 1 && part.right <= card.cardRight + 1, piece + ' leaves the card at ' + part.right.toFixed(1) + 'px');
+          assert.ok(part.left >= -1 && part.right <= measured.width + 1, piece + ' leaves the viewport at ' + part.right.toFixed(1) + 'px');
+          assert.ok(part.scrollGap <= 1, piece + ' clips horizontally by ' + part.scrollGap.toFixed(1) + 'px');
+          for (const line of part.lines) {
+            assert.ok(line.left >= part.left - 1 && line.right <= part.right + 1, piece + ' text runs to ' + line.right.toFixed(1) + 'px');
+          }
+          if (part.kind === 'button') {
+            assert.ok(part.width >= 44 && part.height >= 44, piece + ' tap target is ' + part.width.toFixed(1) + 'x' + part.height.toFixed(1));
+          }
+        }
+      });
+    };
+    const show = async (width, height) => {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelectorAll("#products .concept-card").length === 3'), width + ' layout');
+      await evaluate('window.scrollTo(0, document.documentElement.scrollHeight)');
+      await evaluate('window.scrollTo(0, 0)');
+      return evaluate(measure);
+    };
+
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelectorAll('#products .concept-card').length === 3"), 'Discover concepts rendered');
+    const addToCart = names.map(() => 'Add to demo cart');
+    assertCards(await show(320, 640), '320x640', addToCart);
+    assertCards(await show(390, 844), '390x844', addToCart);
+
+    await show(320, 640);
+    await evaluate("document.querySelector('#products [data-add]').click()");
+    await until(() => evaluate("document.querySelector('#count').textContent === '1'"), 'demo cart has the first concept');
+    await evaluate("document.querySelector('[data-tab=store]').click()");
+    await until(() => evaluate("document.querySelector('#store').hidden === false && document.querySelector('#products button[disabled]') !== null"), 'Discover shows the concept already in the demo cart');
+    const inCart = ['In demo cart', 'Add to demo cart', 'Add to demo cart'];
+    assertCards(await show(320, 640), '320x640 in demo cart', inCart);
+    assertCards(await show(390, 844), '390x844 in demo cart', inCart);
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});
