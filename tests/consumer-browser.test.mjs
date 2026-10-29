@@ -179,17 +179,27 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#cart').hidden"), false);
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '1');
     assert.equal(await evaluate("document.querySelector('#clearCart').textContent"), 'Clear all 1 demo cart item');
-    assert.match(await evaluate("document.querySelector('#result').textContent"), /No order was placed/);
+    assert.equal(await evaluate("document.querySelector('#result').textContent"), 'Added robot concept "Home Robot Concept" to demo cart. 1 demo item in cart. Preview again to continue. No order was placed.');
+    assert.equal(await evaluate("document.querySelector('#result').getAttribute('role')"), 'status');
+    assert.equal(await evaluate("document.querySelector('#result').getAttribute('aria-live')"), 'polite');
+    assert.equal(await evaluate("document.activeElement.tagName"), 'H2', 'Adding a concept keeps the checkout heading handoff');
+    assert.equal(await evaluate("document.querySelector('#items').getAttribute('aria-live')"), null);
+    assert.equal(await evaluate("document.querySelector('#cartSummary').getAttribute('role')"), null);
     assertAboveNav(await measureControls('#items [data-cart-remove], #browseFromCheckout, #clearCart'), 'One-item checkout');
 
     await evaluate("document.querySelector('[data-tab=store]').click()");
     await until(() => evaluate("document.querySelector('#store').hidden === false && document.querySelector('#reviewDiscoverCart').hidden === false"), 'Discover cart review shown');
     assertReachable(await bringAboveNav('#reviewDiscoverCart'), 'Discover review cart');
+    await evaluate("document.querySelector('#reviewDiscoverCart').click()");
+    await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#result').textContent.includes('Reviewing demo cart: 1 demo item')"), 'Review demo cart announced');
+    assert.equal(await evaluate("document.querySelector('#result').textContent"), 'Reviewing demo cart: 1 demo item. This is an order preview only. No payment, reservation or order submission occurred.');
+    assert.equal(await evaluate("document.activeElement.tagName"), 'H2', 'Review demo cart keeps the checkout heading handoff');
 
     await evaluate("document.querySelector('[data-tab=services]').click()");
     await until(() => evaluate("document.querySelector('#services').hidden === false"), 'Services opened');
     await evaluate("document.querySelector('#servicecards [data-add]').click()");
     await until(() => evaluate("document.querySelector('#count').textContent === '2' && document.querySelector('#cart').hidden === false"), 'Two-item checkout opened');
+    assert.equal(await evaluate("document.querySelector('#result').textContent"), 'Added service preview "Robot Setup" to demo cart. 2 demo items in cart. Preview again to continue. No order was placed.');
     const multiRemove = await measureControls('#items [data-cart-remove]');
     assert.equal(multiRemove.scrollY, 0, 'Two-item checkout must be measured on first paint');
     assert.equal(multiRemove.controls.length, 2, 'Two-item checkout keeps both Remove actions');
@@ -204,6 +214,14 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.ok(multiClear.controls[0].height >= 44 && multiClear.controls[0].width >= 44, 'Two-item Clear all tap target is ' + multiClear.controls[0].width.toFixed(1) + 'x' + multiClear.controls[0].height.toFixed(1));
     await evaluate("document.querySelectorAll('#items [data-cart-remove]')[1].click()");
     await until(() => evaluate("document.querySelector('#count').textContent === '1'"), 'Returned to one demo item');
+    assert.match(await evaluate("document.querySelector('#result').textContent"), /Removed service preview "Robot Setup" from demo cart\. 1 demo item remaining\. Preview again to continue\. No order was placed\./);
+
+    await evaluate("document.querySelector('#name').focus(); document.querySelector('#name').value='Temp nick'; document.querySelector('#name').dispatchEvent(new Event('input', { bubbles: true }))");
+    await until(() => evaluate("document.querySelector('#clearPreviewName').hidden === false && document.querySelector('#checkoutToRobots').hidden === true"), 'Clear preview name shown before any order preview');
+    await evaluate("document.querySelector('#clearPreviewName').click()");
+    assert.equal(await evaluate("document.querySelector('#name').value"), '');
+    assert.equal(await evaluate("document.querySelector('#result').textContent"), 'Preview name cleared. This is an on-page demo preview; no order or personal details are submitted.');
+    assert.equal(await evaluate("document.activeElement.id"), 'name', 'Clear preview name returns to the nickname field');
 
     await evaluate("document.querySelector('#preview').click()");
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No payment or order submission occurred/);
@@ -213,7 +231,8 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
 
     await evaluate("document.querySelector('#robotNickname').value='Browser Test Robot'; document.querySelector('#robotBrand').value='Example Maker'; document.querySelector('#robotModel').value='Model A'; document.querySelector('#registerRobot').requestSubmit()");
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /1 of 30/);
-    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Compatibility not verified/);
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Compatibility not verified; no device connected/);
+    assert.equal(await evaluate("document.querySelector('#robotMessage').getAttribute('role')"), 'status');
     const filledRobots = '#robots #openSkillsFromRobots, #robots #robotNickname, #robots #robotBrand, #robots #robotModel, #robots #saveDemoProfile, #robots #profileSearch, #robots #clearProfiles, #robots #myrobots button, #robots #reviewRobotsCart';
     const savedRobots = await bringAboveNav(filledRobots);
     assert.equal(savedRobots.length, 11, 'Filled My Robots shows the skills handoff, profile form, search, clear, profile actions, and cart review');
@@ -222,7 +241,14 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(savedOverflow, 0, 'Filled My Robots overflows horizontally by ' + savedOverflow + 'px');
     await evaluate("document.querySelector('#openSkillsFromRobots').click()");
     assert.equal(await evaluate("document.querySelector('#skills').hidden"), false);
-    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Compatibility has not been checked/);
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Compatibility has not been checked; installation is unavailable/);
+    assert.equal(await evaluate("document.querySelector('#skillsRobotSummary').getAttribute('role')"), 'status');
+    await evaluate("document.querySelector('#skillRobotSelect').focus(); document.querySelector('#skillRobotSelect').value=''; document.querySelector('#skillRobotSelect').dispatchEvent(new Event('change', { bubbles: true }))");
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /1 local demo robot profile\(s\) saved/);
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /installation is unavailable/);
+    assert.equal(await evaluate("document.activeElement.id"), 'skillRobotSelect', 'Changing the skill preview keeps focus on the profile select');
+    await evaluate("document.querySelector('#skillRobotSelect').value=document.querySelector('#skillRobotSelect').options[1].value; document.querySelector('#skillRobotSelect').dispatchEvent(new Event('change', { bubbles: true }))");
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Viewing generic skill previews for local demo profile: Browser Test Robot/);
     await evaluate('window.scrollTo(0, 0)');
     const filledSkills = '#skills #openServicesFromSkills, #skills #skillRobotSelect, #skills #openRobotsFromSkills, #skills #skillcards button';
     const skillsHandoff = await measureControls('#skills #openServicesFromSkills, #skills #skillRobotSelect, #skills #openRobotsFromSkills');
