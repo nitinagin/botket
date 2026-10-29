@@ -107,6 +107,9 @@
   main:has(#cart:not([hidden])) > p { margin: 0 0 8px; }
   #cart > h2 { margin: 8px 0 4px; }
   #cart > p.muted { margin: 0 0 6px; }
+  /* At 390px the filled Checkout Preview order and My Robots handoff buttons were 39px tall. */
+  #cart #preview,
+  #cart #checkoutToRobots { box-sizing: border-box; min-height: 44px; min-width: 44px; }
   /* At 390px Manage demo robots in Skills sat under the fixed bottom nav. */
   body:has(#skills:not([hidden])) header { padding: 8px 16px; }
   main:has(#skills:not([hidden])) { padding-top: 8px; }
