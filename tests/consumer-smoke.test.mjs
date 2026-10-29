@@ -2192,6 +2192,32 @@ test('mobile Discover keeps the first concept card actions above the fixed botto
   assert.match(app, /Concept only/);
 });
 
+test('mobile Discover keeps search, category filters, and recovery actions at least 44px', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px Discover category chips were 39px tall, concept search was 37px tall, and Clear search, Show all, and Review demo cart were 39px/);
+  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > h2 \{ margin: 4px 0 2px; \}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > p\.muted \{ margin-bottom: 2px; \}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) \.store-filters \{ margin-bottom: 2px; \}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) #filterSummary \{ margin: 0 0 2px; \}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > \.grid \{ margin-top: 0; \}/);
+  assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) \.concept-card \{\s*gap: 4px;\s*padding-top: 4px;\s*\}/);
+
+  const store = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(store, 'Expected the Discover section');
+  assert.match(store, /Illustrative concepts only\. No products are available to order through this demo\./);
+  assert.match(store, /data-category="all"[^>]*aria-pressed="true">All robots/);
+  assert.match(store, /data-category="home"/);
+  assert.match(store, /data-category="companion"/);
+  assert.match(store, /data-category="education"/);
+  assert.match(store, /id="robotSearch" type="search"/);
+  assert.match(store, /id="clearRobotSearch" hidden aria-label="Clear robot concept search"/);
+  assert.match(store, /id="resetDiscoverFilters" hidden>Show all robot concepts/);
+  assert.match(store, /id="reviewDiscoverCart" hidden>Review demo cart/);
+  assert.match(page, /\.concept-actions button\{[^}]*min-height:44px/);
+  assert.doesNotMatch(store, /payment method|place order|buy now|card number/i);
+});
+
 
 test('Services shows recovery routes before generic cards and names them without claiming compatibility', () => {
   const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];

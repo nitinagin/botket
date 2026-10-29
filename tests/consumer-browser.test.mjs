@@ -120,11 +120,54 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
         assert.ok(control.height >= 44 && control.width >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
       }
     };
+    const bringAboveNav = selector => evaluate(`(() => {
+      const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})]
+        .filter(el => !el.hidden && getComputedStyle(el).display !== 'none');
+      const nav = () => document.querySelector('.tabs').getBoundingClientRect();
+      const measured = nodes.map(el => {
+        window.scrollTo(0, 0);
+        let rect = el.getBoundingClientRect();
+        let overlap = rect.bottom - nav().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        overlap = rect.bottom - nav().top;
+        if (overlap > 0) window.scrollBy(0, Math.ceil(overlap));
+        rect = el.getBoundingClientRect();
+        const bar = nav();
+        return { height: rect.height, width: rect.width, gap: bar.top - rect.bottom, top: rect.top };
+      });
+      window.scrollTo(0, 0);
+      return measured;
+    })()`);
+    const assertReachable = (measured, label) => {
+      assert.ok(measured.length > 0, label + ' controls missing');
+      for (const control of measured) {
+        assert.ok(control.top >= 0, label + ' is clipped by the top of the viewport');
+        assert.ok(control.gap >= 0, label + ' overlaps the bottom nav by ' + (-control.gap).toFixed(2) + 'px');
+        assert.ok(control.height >= 44 && control.width >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+      }
+    };
 
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
     await until(() => evaluate("document.querySelector('header img')?.naturalHeight > 0 && Boolean(document.querySelector('#products [data-add]'))"), 'Discover concepts rendered');
     assert.equal(await evaluate("document.querySelector('#store').hidden"), false);
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.tabs')).position"), 'fixed');
+    const discoverFilters = await measureControls('#store .store-filters button, #store #robotSearch');
+    assert.equal(discoverFilters.controls.length, 5, 'Discover shows four category chips and search');
+    assertAboveNav(discoverFilters, 'Discover filters and search');
+    assertAboveNav(await measureControls('#products article:first-child .concept-actions button'), 'Discover first concept actions');
+    assertReachable(await bringAboveNav('#products .concept-actions button'), 'Discover concept actions');
+    await evaluate("document.querySelector('#robotSearch').value='home'; document.querySelector('#robotSearch').dispatchEvent(new Event('input', { bubbles: true }))");
+    await until(() => evaluate("document.querySelector('#clearRobotSearch').hidden === false && document.querySelectorAll('#products .concept-actions button').length === 2"), 'Discover search match shown');
+    assertAboveNav(await measureControls('#store #clearRobotSearch, #products .concept-actions button'), 'Discover search match');
+    await evaluate("document.querySelector('#robotSearch').value='zzzz-no-match'; document.querySelector('#robotSearch').dispatchEvent(new Event('input', { bubbles: true }))");
+    await until(() => evaluate("document.querySelector('#resetDiscoverFilters').hidden === false"), 'Discover no-match recovery shown');
+    const discoverRecovery = await measureControls('#store #clearRobotSearch, #store #resetDiscoverFilters');
+    assert.equal(discoverRecovery.controls.length, 2, 'Discover shows Clear search and Show all');
+    assertAboveNav(discoverRecovery, 'Discover clear and reset');
+    await evaluate("document.querySelector('#resetDiscoverFilters').click()");
+    await until(() => evaluate("document.querySelectorAll('#products [data-add]').length === 3 && document.querySelector('#robotSearch').value === ''"), 'Discover filters restored');
+    await evaluate('window.scrollTo(0, 0)');
 
     await evaluate("document.querySelector('[data-tab=cart]').click()");
     await until(() => evaluate("document.querySelector('#cart').hidden === false"), 'Empty checkout opened');
@@ -138,6 +181,10 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#clearCart').textContent"), 'Clear all 1 demo cart item');
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No order was placed/);
     assertAboveNav(await measureControls('#items [data-cart-remove], #browseFromCheckout, #clearCart'), 'One-item checkout');
+
+    await evaluate("document.querySelector('[data-tab=store]').click()");
+    await until(() => evaluate("document.querySelector('#store').hidden === false && document.querySelector('#reviewDiscoverCart').hidden === false"), 'Discover cart review shown');
+    assertReachable(await bringAboveNav('#reviewDiscoverCart'), 'Discover review cart');
 
     await evaluate("document.querySelector('[data-tab=services]').click()");
     await until(() => evaluate("document.querySelector('#services').hidden === false"), 'Services opened');

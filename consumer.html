@@ -88,6 +88,26 @@
   #store > .grid { margin-top: 4px; }
   .concept-card { gap: 8px; padding: 12px 14px; }
   .concept-card h3 { margin: 0; }
+  /* At 390px Discover category chips were 39px tall, concept search was 37px tall, and Clear search, Show all, and Review demo cart were 39px. */
+  #store .store-filters button,
+  #store #robotSearch,
+  #store #clearRobotSearch,
+  #store #resetDiscoverFilters,
+  #store #reviewDiscoverCart {
+    box-sizing: border-box;
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Clear search adds a row. Keep the matching concept actions above the fixed bottom nav. */
+  #store:has(#clearRobotSearch:not([hidden])) > h2 { margin: 4px 0 2px; }
+  #store:has(#clearRobotSearch:not([hidden])) > p.muted { margin-bottom: 2px; }
+  #store:has(#clearRobotSearch:not([hidden])) .store-filters { margin-bottom: 2px; }
+  #store:has(#clearRobotSearch:not([hidden])) #filterSummary { margin: 0 0 2px; }
+  #store:has(#clearRobotSearch:not([hidden])) > .grid { margin-top: 0; }
+  #store:has(#clearRobotSearch:not([hidden])) .concept-card {
+    gap: 4px;
+    padding-top: 4px;
+  }
   /* Services: surface both demo-only recovery routes before the fixed mobile nav. */
   body:has(#services:not([hidden])) header { padding: 8px 16px; }
   main:has(#services:not([hidden])) { padding-top: 8px; }
