@@ -1609,3 +1609,263 @@ test('320px section handoffs start at the heading and keep the next demo action 
     }
   }
 });
+
+test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 390', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-focus-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    const url = 'http://127.0.0.1:' + server.address().port + '/consumer.html';
+    const snapshot = `(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const parse = color => {
+        const match = String(color).match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
+        if (!match) return null;
+        return { r: +match[1], g: +match[2], b: +match[3], a: match[4] === undefined ? 1 : +match[4] };
+      };
+      const channel = value => {
+        const s = value / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const lum = color => 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+      const contrast = (foreground, background) => {
+        if (!foreground || !background || foreground.a < 1 || background.a < 1) return null;
+        const hi = Math.max(lum(foreground), lum(background));
+        const lo = Math.min(lum(foreground), lum(background));
+        return (hi + 0.05) / (lo + 0.05);
+      };
+      const opaqueBackground = el => {
+        let node = el && el.parentElement;
+        while (node) {
+          const color = parse(getComputedStyle(node).backgroundColor);
+          if (color && color.a >= 1) return color;
+          node = node.parentElement;
+        }
+        return { r: 255, g: 253, b: 245, a: 1 };
+      };
+      const el = document.activeElement;
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      const header = document.querySelector('header');
+      const headerStyle = getComputedStyle(header);
+      const headerBox = header.getBoundingClientRect();
+      const outlineWidth = parseFloat(style.outlineWidth) || 0;
+      const outlineOffset = parseFloat(style.outlineOffset) || 0;
+      const labels = el.labels ? [...el.labels].map(label => text(label.innerText)).filter(Boolean).join(' ') : '';
+      return {
+        tag: el.tagName,
+        id: el.id || '',
+        className: String(el.className || ''),
+        name: text(el.getAttribute('aria-label') || labels || el.innerText || '').slice(0, 160),
+        focusVisible: el.matches(':focus-visible'),
+        inNav: !!el.closest('.tabs'),
+        inSection: !!el.closest('main section'),
+        outlineStyle: style.outlineStyle,
+        outlineWidth,
+        outlineOffset,
+        outlineColor: style.outlineColor,
+        outlineContrast: contrast(parse(style.outlineColor), opaqueBackground(el)),
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height,
+        ringTop: rect.top - outlineOffset - outlineWidth,
+        ringBottom: rect.bottom + outlineOffset + outlineWidth,
+        ringLeft: rect.left - outlineOffset - outlineWidth,
+        ringRight: rect.right + outlineOffset + outlineWidth,
+        navTop: nav.top,
+        headerPosition: headerStyle.position,
+        stickyHeader: headerStyle.position === 'fixed' || headerStyle.position === 'sticky',
+        headerBottom: headerBox.bottom
+      };
+    })()`;
+    const pressTab = async () => {
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+      await sleep(40);
+    };
+    const required = [
+      'nav-discover', 'nav-checkout', 'nav-my-robots', 'nav-skills', 'nav-services',
+      'concept-add', 'concept-profile', 'cart-remove', 'cart-clear', 'nickname', 'robot-nickname',
+      'preview', 'clear-preview-name', 'review-cart', 'save-profile', 'remove-profile', 'skill-select',
+      'add-service', 'handoff-continue', 'handoff-browse', 'handoff-discover', 'handoff-skills',
+      'handoff-services', 'handoff-manage-from-skills', 'handoff-skills-from-services', 'handoff-manage-from-services',
+      'handoff-empty-browse', 'handoff-empty-robots'
+    ];
+
+    let pageOpen = false;
+    for (const [width, height] of [[320, 640], [390, 844]]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      if (pageOpen) await evaluate("localStorage.clear()");
+      await send('Page.navigate', { url });
+      pageOpen = true;
+      await until(() => evaluate("document.querySelector('#products [data-add]') !== null && window.innerWidth === " + width), 'Discover ready at ' + width);
+      const seen = new Set();
+      const note = measured => {
+        const { id, name, inNav } = measured;
+        if (inNav && name.startsWith('Discover')) seen.add('nav-discover');
+        if (inNav && name.startsWith('Checkout')) seen.add('nav-checkout');
+        if (inNav && name.startsWith('My Robots')) seen.add('nav-my-robots');
+        if (inNav && name === 'Skills') seen.add('nav-skills');
+        if (inNav && name === 'Services') seen.add('nav-services');
+        if (/^Add .+ to demo cart \(preview only\)$/.test(name)) seen.add('concept-add');
+        if (name.startsWith('Create local demo profile')) seen.add('concept-profile');
+        if (name.startsWith('Remove robot concept') || name.startsWith('Remove service preview')) seen.add('cart-remove');
+        if (id === 'clearCart') seen.add('cart-clear');
+        if (id === 'name') seen.add('nickname');
+        if (id === 'robotNickname') seen.add('robot-nickname');
+        if (id === 'preview') seen.add('preview');
+        if (id === 'clearPreviewName') seen.add('clear-preview-name');
+        if (/^review(?:Discover|Robots|Skills|Services)Cart$/.test(id)) seen.add('review-cart');
+        if (id === 'saveDemoProfile') seen.add('save-profile');
+        if (name.startsWith('Remove demo profile')) seen.add('remove-profile');
+        if (id === 'skillRobotSelect') seen.add('skill-select');
+        if (/^Add .+ service preview to demo cart \(no booking\)$/.test(name)) seen.add('add-service');
+        if (id === 'checkoutToRobots') seen.add('handoff-continue');
+        if (id === 'browseFromCheckout') seen.add('handoff-browse');
+        if (id === 'openDiscoverFromRobots') seen.add('handoff-discover');
+        if (id === 'openSkillsFromRobots') seen.add('handoff-skills');
+        if (id === 'openServicesFromSkills') seen.add('handoff-services');
+        if (id === 'openRobotsFromSkills') seen.add('handoff-manage-from-skills');
+        if (id === 'openSkillsFromServices') seen.add('handoff-skills-from-services');
+        if (id === 'openRobotsFromServices') seen.add('handoff-manage-from-services');
+        if (name.startsWith('Browse demo robots') || name.startsWith('Browse service previews')) seen.add('handoff-empty-browse');
+        if (name.includes('Open My Robots')) seen.add('handoff-empty-robots');
+      };
+      const assertFocus = measured => {
+        const where = width + 'x' + height + ' ' + (measured.id || measured.name || measured.tag);
+        assert.equal(measured.focusVisible, true, where + ' has no :focus-visible ring');
+        assert.ok(measured.outlineWidth >= 2 && measured.outlineStyle !== 'none' && measured.outlineStyle !== 'hidden', where + ' outline is ' + measured.outlineWidth + 'px ' + measured.outlineStyle);
+        assert.ok(measured.outlineContrast >= 3, where + ' focus contrast is ' + measured.outlineContrast + ' (' + measured.outlineColor + ')');
+        assert.ok(measured.width >= 44 && measured.height >= 44, where + ' tap target is ' + measured.width.toFixed(1) + 'x' + measured.height.toFixed(1));
+        if (measured.stickyHeader) {
+          assert.ok(measured.top >= measured.headerBottom - 0.5, where + ' is under the sticky header');
+          assert.ok(measured.ringTop >= measured.headerBottom - 0.5, where + ' focus ring is under the sticky header');
+        }
+        if (measured.inNav) {
+          assert.ok(measured.top >= -0.5 && measured.left >= -0.5 && measured.right <= width + 0.5 && measured.bottom <= height + 0.5, where + ' is outside the viewport');
+          assert.ok(measured.ringTop >= -0.5 && measured.ringLeft >= -0.5 && measured.ringRight <= width + 0.5 && measured.ringBottom <= height + 0.5, where + ' focus ring is clipped by the viewport');
+          return;
+        }
+        assert.ok(measured.top >= -0.5, where + ' starts above the viewport at ' + measured.top.toFixed(1));
+        assert.ok(measured.bottom <= measured.navTop + 0.5, where + ' is under the bottom nav by ' + (measured.bottom - measured.navTop).toFixed(1) + 'px');
+        assert.ok(measured.ringBottom <= measured.navTop + 0.5, where + ' focus ring is under the bottom nav by ' + (measured.ringBottom - measured.navTop).toFixed(1) + 'px');
+        assert.ok(measured.ringTop >= -0.5 && measured.ringLeft >= -0.5 && measured.ringRight <= width + 0.5, where + ' focus ring leaves the viewport');
+      };
+      const tabThrough = async () => {
+        await evaluate("document.querySelector('.skip-link').focus()");
+        for (let i = 0; i < 60; i++) {
+          await pressTab();
+          const measured = await evaluate(snapshot);
+          if (String(measured.className).includes('skip-link')) {
+            assert.ok(i > 0, width + 'x' + height + ' Tab did not leave the skip link');
+            return;
+          }
+          if ((measured.inNav || measured.inSection) && ['BUTTON', 'INPUT', 'SELECT'].includes(measured.tag)) {
+            assertFocus(measured);
+            note(measured);
+          }
+        }
+        throw new Error('Tab walk did not return to the skip link at ' + width + 'x' + height);
+      };
+
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=cart]').click()");
+      await until(() => evaluate("document.querySelector('#cart').hidden === false"), 'Empty checkout');
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=robots]').click()");
+      await until(() => evaluate("document.querySelector('#robots').hidden === false && document.querySelector('#openDiscoverFromRobots').hidden === false"), 'Empty My Robots');
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=skills]').click()");
+      await until(() => evaluate("document.querySelector('#skills').hidden === false"), 'Empty Skills');
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=services]').click()");
+      await until(() => evaluate("document.querySelector('#services').hidden === false"), 'Empty Services');
+      await tabThrough();
+
+      await evaluate("document.querySelector('#products [data-add]').click()");
+      await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '1'"), 'Robot concept in the demo cart');
+      await evaluate(`(() => {
+        const name = document.querySelector('#name');
+        name.value = 'Demo nick';
+        name.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('#preview').click();
+      })()`);
+      await until(() => evaluate("document.querySelector('#checkoutToRobots').hidden === false && document.querySelector('#clearPreviewName').hidden === false"), 'Checkout preview ready');
+      await tabThrough();
+
+      await evaluate(`(() => {
+        document.querySelector('[data-tab=robots]').click();
+        document.querySelector('#robotNickname').value = 'Home helper';
+        document.querySelector('#robotBrand').value = 'Example Robotics';
+        document.querySelector('#robotModel').value = 'Model A';
+        document.querySelector('#registerRobot').requestSubmit();
+      })()`);
+      await until(() => evaluate("document.querySelector('#profileCount').textContent.includes('1 of 30') && document.querySelector('#myrobots [data-remove]') !== null"), 'Demo profile saved');
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=skills]').click()");
+      await until(() => evaluate("document.querySelector('#skills').hidden === false && document.querySelector('#skillRobotSelect').disabled === false"), 'Skills profile select enabled');
+      await tabThrough();
+      await evaluate("document.querySelector('[data-tab=services]').click()");
+      await until(() => evaluate("document.querySelector('#services').hidden === false && document.querySelector('#serviceRobotSelect').disabled === false"), 'Services profile select enabled');
+      await tabThrough();
+
+      const missing = required.filter(key => !seen.has(key));
+      assert.deepEqual(missing, [], width + 'x' + height + ' did not Tab to ' + missing.join(', '));
+    }
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});

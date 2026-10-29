@@ -45,6 +45,10 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /scroll-margin-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\)/);
 });
 
+test('buttons, fields, and selects keep a 3px keyboard focus ring', () => {
+  assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
+});
+
 test('mobile bottom navigation keeps whole labels, a non-color current section and safe-area insets', () => {
   const nav = page.match(/<nav class="tabs"[\s\S]*?<\/nav>/)?.[0];
   assert.ok(nav, 'Expected the platform section navigation');
