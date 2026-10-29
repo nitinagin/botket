@@ -214,6 +214,12 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await evaluate("document.querySelector('#robotNickname').value='Browser Test Robot'; document.querySelector('#robotBrand').value='Example Maker'; document.querySelector('#robotModel').value='Model A'; document.querySelector('#registerRobot').requestSubmit()");
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /1 of 30/);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Compatibility not verified/);
+    const filledRobots = '#robots #openSkillsFromRobots, #robots #robotNickname, #robots #robotBrand, #robots #robotModel, #robots #saveDemoProfile, #robots #profileSearch, #robots #clearProfiles, #robots #myrobots button, #robots #reviewRobotsCart';
+    const savedRobots = await bringAboveNav(filledRobots);
+    assert.equal(savedRobots.length, 11, 'Filled My Robots shows the skills handoff, profile form, search, clear, profile actions, and cart review');
+    assertReachable(savedRobots, 'Filled My Robots');
+    const savedOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    assert.equal(savedOverflow, 0, 'Filled My Robots overflows horizontally by ' + savedOverflow + 'px');
     await evaluate("document.querySelector('#openSkillsFromRobots').click()");
     assert.equal(await evaluate("document.querySelector('#skills').hidden"), false);
     assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Compatibility has not been checked/);
@@ -232,6 +238,12 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Browser Test Robot/);
     assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Example Maker/);
     assert.match(await evaluate("document.querySelector('#robots > p.muted').textContent"), /does not verify ownership or connect hardware/);
+    const restoredRobots = await bringAboveNav('#robots #openSkillsFromRobots, #robots #robotNickname, #robots #robotBrand, #robots #robotModel, #robots #saveDemoProfile, #robots #profileSearch, #robots #clearProfiles, #robots #myrobots button');
+    assert.equal(restoredRobots.length, 10, 'Reloaded My Robots keeps the saved profile actions without the unsaved cart');
+    assertReachable(restoredRobots, 'Reloaded My Robots');
+    const restoredOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    assert.equal(restoredOverflow, 0, 'Reloaded My Robots overflows horizontally by ' + restoredOverflow + 'px');
+    assert.equal(await evaluate("document.querySelector('#reviewRobotsCart').hidden"), true, 'A reload must not turn the demo cart into a saved order');
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {

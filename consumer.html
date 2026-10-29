@@ -148,6 +148,21 @@
   #skills #skillsRobotSummary { margin: 4px 0; }
   #skills #openRobotsFromSkills { box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; }
   #skills > .grid { margin-top: 8px; }
+  /* At 390px filled My Robots nickname, brand, model, and profile search were 37px tall, and Save, Discard, Clear search, Clear all, the Services handoff, Remove, and Review demo cart were 39px. */
+  #robots #robotNickname,
+  #robots #robotBrand,
+  #robots #robotModel,
+  #robots #saveDemoProfile,
+  #robots #clearRobotDraft,
+  #robots #profileSearch,
+  #robots #clearProfileSearch,
+  #robots #clearProfiles,
+  #robots #myrobots button:not(.next-step),
+  #robots #reviewRobotsCart {
+    box-sizing: border-box;
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* Keyboard-first entry point, above the fixed mobile navigation. */
