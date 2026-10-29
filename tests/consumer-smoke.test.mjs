@@ -2542,6 +2542,72 @@ test('mobile bottom navigation keeps 44px targets, the current section, and a vi
   assert.doesNotMatch(buttonRule, /outline:\s*none|outline:\s*0/);
 });
 
+test('Discover concept cards name each demo concept without purchase, integration, or compatibility claims', () => {
+  const cardSource = app.match(/function card\(x,action,variant=''\)\{[^\n]*\}/)?.[0];
+  const renderSource = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/)?.[0];
+  assert.ok(cardSource && renderSource, 'Expected the Discover concept card renderer');
+
+  const catalog = [
+    { id: 'r1', name: 'Home Robot Concept', price: 34900, category: 'home' },
+    { id: 'r2', name: 'Companion Robot Concept', price: 24900, category: 'companion' },
+    { id: 'r3', name: 'Educational Robotics Kit Concept', price: 6900, category: 'education' }
+  ];
+  const elements = {
+    robotSearch: { value: '' },
+    clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true },
+    filterSummary: { textContent: '' },
+    products: { innerHTML: '', role: '', setAttribute(name, value) { if (name === 'role') this.role = value; } },
+    skillcards: { innerHTML: '' },
+    servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: catalog, skills: [], services: [], selectedCategory: 'all', cart: [],
+    byId: id => elements[id],
+    money: n => '฿' + n.toLocaleString('en-US'),
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {},
+    updateServicesContext: () => {}, renderCart: () => {},
+    document: { querySelectorAll: () => [] }
+  };
+  context.card = new Script('(' + cardSource + ')').runInNewContext(context);
+  const render = new Script('(' + renderSource.trim() + ')').runInNewContext(context);
+  const forbidden = /buy now|purchase|place order|payment|add to cart\b|works with|compatible with|connect your|verified compatible|real robot|in stock/i;
+
+  const assertCards = (mode) => {
+    const cards = elements.products.innerHTML.match(/<article role="listitem" class="card concept-card">[\s\S]*?<\/article>/g);
+    assert.equal(cards?.length, 3, mode);
+    cards.forEach((card, index) => {
+      const robot = catalog[index];
+      const label = robot.category.charAt(0).toUpperCase() + robot.category.slice(1);
+      assert.match(card, new RegExp('^<article role="listitem" class="card concept-card"><h3>' + robot.name + '</h3>'), mode + ' heading is the accessible name');
+      assert.match(card, new RegExp('class="concept-price">฿' + robot.price.toLocaleString('en-US') + ' · Illustrative price</p>'), mode);
+      assert.match(card, new RegExp('class="concept-label">' + label + ' · Concept only</p>'), mode);
+      assert.match(card, new RegExp('aria-label="Create local demo profile for ' + robot.name + ' \\(ownership and compatibility not verified\\)"'), mode);
+      assert.doesNotMatch(card, /<img\b/i, mode + ' has no image that would need alt text');
+      assert.doesNotMatch(card, forbidden, mode + ' implies a real offer');
+    });
+  };
+
+  render();
+  assertCards('available concept');
+  assert.match(elements.products.innerHTML, /aria-label="Add Home Robot Concept to demo cart \(preview only\)">Add to demo cart/);
+  assert.match(elements.products.innerHTML, /aria-label="Add Educational Robotics Kit Concept to demo cart \(preview only\)">Add to demo cart/);
+  assert.doesNotMatch(elements.products.innerHTML, /disabled/);
+
+  context.cart = [catalog[0]];
+  render();
+  assertCards('concept already in the demo cart');
+  assert.match(elements.products.innerHTML, /disabled aria-disabled="true" aria-label="Home Robot Concept already in demo cart \(preview only\)">In demo cart/);
+  assert.match(elements.products.innerHTML, /aria-label="Add Companion Robot Concept to demo cart \(preview only\)">Add to demo cart/);
+
+  assert.match(page, /\.concept-actions\{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto\}/);
+  assert.match(page, /\.concept-actions button\{flex:1 1 150px;min-height:44px\}/);
+  assert.doesNotMatch(page, /\.concept-(?:card|price|label|actions)[^{]*\{[^}]*white-space:\s*nowrap/);
+  assert.doesNotMatch(page, /\.concept-(?:card|price|label)[^{]*\{[^}]*overflow(?:-x)?:\s*hidden/);
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /\.grid \{ grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\); \}/);
+});
+
 test('section changes move focus to the heading once and do not smooth-scroll or announce it twice', () => {
   assert.match(app, /heading\.tabIndex=-1;heading\.focus\(\)/);
   assert.doesNotMatch(app, /scrollIntoView|behavior:\s*['"]smooth['"]|scroll-behavior:\s*smooth/);
