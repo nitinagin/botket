@@ -1907,3 +1907,299 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
     }
   }
 });
+
+test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services jumps instant at 320x640 and 390x844', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-reduced-motion-'));
+  let chrome, cdp;
+  const motionScript = `(() => {
+    const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+    const nodes = [
+      document.documentElement,
+      document.body,
+      document.querySelector('.skip-link'),
+      ...document.querySelectorAll('.tabs button, .toast, [data-toast]'),
+      ...(section ? section.querySelectorAll('.card, button, .status, [role="status"]') : [])
+    ];
+    const durations = value => String(value).split(',').map(part => part.trim());
+    const bad = [];
+    for (const el of nodes) {
+      if (!el) continue;
+      const style = getComputedStyle(el);
+      const name = el.id || el.getAttribute('class') || el.tagName;
+      if (style.animationName !== 'none') bad.push(name + ' animation ' + style.animationName);
+      if (durations(style.animationDuration).some(part => part !== '0s')) bad.push(name + ' animation-duration ' + style.animationDuration);
+      if (durations(style.transitionDuration).some(part => part !== '0s')) bad.push(name + ' transition-duration ' + style.transitionDuration);
+    }
+    const scrolling = document.scrollingElement || document.documentElement;
+    return {
+      bad,
+      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+      scrolling: getComputedStyle(scrolling).scrollBehavior,
+      animations: document.documentElement.getAnimations({ subtree: true }).length,
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      prefersNone: matchMedia('(prefers-reduced-motion: no-preference)').matches
+    };
+  })()`;
+  const headings = {
+    store: 'Explore robots',
+    cart: 'Demo checkout',
+    robots: 'My Robots',
+    skills: 'Skills',
+    services: 'Services'
+  };
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const url = 'http://127.0.0.1:' + server.address().port + '/consumer.html';
+
+    const runJourney = async (width, height, motion) => {
+      const where = width + 'x' + height + ' ' + motion;
+      const expectReduced = motion === 'reduce';
+      await send('Emulation.setFocusEmulationEnabled', { enabled: false });
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] });
+      await send('Page.navigate', { url });
+      let lastReady;
+      try {
+        await until(async () => {
+          lastReady = await evaluate(`(() => ({
+            cards: document.querySelector('#products [data-add]') !== null,
+            image: (document.querySelector('header img')?.naturalHeight || 0) > 0,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+            prefersNone: matchMedia('(prefers-reduced-motion: no-preference)').matches
+          }))()`);
+          return lastReady && lastReady.cards && lastReady.image && lastReady.width === width && lastReady.height === height
+            && lastReady.reduced === expectReduced && lastReady.prefersNone === !expectReduced;
+        }, 'Discover ready at ' + where);
+      } catch (error) {
+        throw new Error(error.message + ' last=' + JSON.stringify(lastReady));
+      }
+      const steps = [];
+      const assertStill = async (label, snap) => {
+        const settled = await evaluate(`new Promise(resolve => {
+          const y = window.scrollY;
+          const heading = document.querySelector('main section:not([hidden]) h2');
+          const main = document.getElementById('main-content');
+          const link = document.querySelector('.skip-link');
+          const top = heading.getBoundingClientRect().top;
+          const mainTop = main.getBoundingClientRect().top;
+          const linkTop = link.getBoundingClientRect().top;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            resolve({
+              y, laterY: window.scrollY,
+              top, laterTop: document.querySelector('main section:not([hidden]) h2').getBoundingClientRect().top,
+              mainTop, laterMain: document.getElementById('main-content').getBoundingClientRect().top,
+              linkTop, laterLink: document.querySelector('.skip-link').getBoundingClientRect().top,
+              motion: ${motionScript}
+            });
+          }));
+        })`);
+        assert.ok(Math.abs(settled.laterY - settled.y) <= 0.5, where + ' ' + label + ' kept scrolling after the jump (' + settled.y + ' to ' + settled.laterY + ')');
+        assert.ok(Math.abs(settled.laterTop - settled.top) <= 0.5, where + ' ' + label + ' heading moved after the jump');
+        assert.ok(Math.abs(settled.laterMain - settled.mainTop) <= 0.5, where + ' ' + label + ' main moved after the jump');
+        assert.ok(Math.abs(settled.laterLink - settled.linkTop) <= 0.5, where + ' ' + label + ' skip link moved after the jump');
+        assert.equal(settled.motion.scrollBehavior, 'auto', where + ' ' + label + ' scroll-behavior');
+        assert.equal(settled.motion.scrolling, 'auto', where + ' ' + label + ' scrolling element');
+        assert.equal(settled.motion.animations, 0, where + ' ' + label + ' animations ' + settled.motion.animations);
+        assert.deepEqual(settled.motion.bad, [], where + ' ' + label + ' computed motion');
+        assert.equal(snap.scrollBehavior, 'auto', where + ' ' + label);
+        assert.equal(snap.scrolling, 'auto', where + ' ' + label);
+        assert.equal(snap.animations, 0, where + ' ' + label);
+        assert.deepEqual(snap.bad, [], where + ' ' + label);
+        return true;
+      };
+
+      const paint = await evaluate(`(() => ({ motion: ${motionScript}, headingTop: document.querySelector('#store h2').getBoundingClientRect().top, scrollY: window.scrollY }))()`);
+      assert.equal(paint.motion.reduced, expectReduced, where);
+      assert.equal(paint.scrollY, 0, where + ' Discover did not start at the top');
+      assert.ok(paint.headingTop >= 0, where + ' Discover heading starts above the viewport');
+      steps.push({ kind: 'styles', label: 'Discover', instant: await assertStill('Discover', paint.motion), scrollBehavior: paint.motion.scrollBehavior, unanimated: paint.motion.bad.length === 0 && paint.motion.animations === 0 });
+
+      await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+      const skipShow = await evaluate(`(() => {
+        const link = document.querySelector('.skip-link');
+        const before = link.getBoundingClientRect().top;
+        link.focus();
+        const motion = ${motionScript};
+        return { before, top: link.getBoundingClientRect().top, focusVisible: link.matches(':focus-visible'), scrollY: window.scrollY, motion };
+      })()`);
+      assert.ok(skipShow.before <= -40, where + ' skip link was already on screen at ' + skipShow.before);
+      assert.ok(Math.abs(skipShow.top - 12) <= 1, where + ' skip link appeared at ' + skipShow.top);
+      assert.equal(skipShow.focusVisible, true, where + ' skip link has no keyboard focus');
+      assert.equal(skipShow.scrollY, 0, where + ' focusing the skip link scrolled the page');
+      steps.push({ kind: 'skip-show', instant: await assertStill('Skip link show', skipShow.motion), scrollBehavior: 'auto', unanimated: true });
+
+      const skipHide = await evaluate(`(() => {
+        const link = document.querySelector('.skip-link');
+        link.blur();
+        const motion = ${motionScript};
+        return { top: link.getBoundingClientRect().top, focused: document.activeElement === link, motion };
+      })()`);
+      assert.ok(skipHide.top <= -40, where + ' skip link stayed on screen after blur at ' + skipHide.top);
+      assert.equal(skipHide.focused, false, where + ' skip link stayed focused');
+      steps.push({ kind: 'skip-hide', instant: await assertStill('Skip link hide', skipHide.motion), scrollBehavior: 'auto', unanimated: true });
+      await send('Emulation.setFocusEmulationEnabled', { enabled: false });
+
+      const jump = async (selector, destination, label) => {
+        const measured = await evaluate(`(() => {
+          window.scrollTo(0, document.documentElement.scrollHeight);
+          const maxY = Math.max(0, document.documentElement.scrollHeight - document.documentElement.clientHeight);
+          const beforeHeading = document.querySelector('main section:not([hidden]) h2');
+          const beforeTop = beforeHeading.getBoundingClientRect().top;
+          const beforeY = window.scrollY;
+          const control = document.querySelector(${JSON.stringify(selector)});
+          if (!control || control.hidden || getComputedStyle(control).display === 'none') return { missing: true };
+          control.focus({ preventScroll: true });
+          control.click();
+          const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+          const heading = section.querySelector('h2');
+          const active = document.activeElement;
+          return {
+            maxY, beforeTop, beforeY, atBottom: Math.abs(beforeY - maxY) <= 1,
+            section: section.id,
+            heading: heading.textContent.trim(),
+            headingTop: heading.getBoundingClientRect().top,
+            scrollY: window.scrollY,
+            focused: active === heading,
+            activeTag: active && active.tagName,
+            activeId: active && active.id,
+            focusVisible: active.matches(':focus-visible'),
+            tabindex: heading.getAttribute('tabindex'),
+            aria: document.querySelector('[aria-current="page"]')?.dataset.tab,
+            motion: ${motionScript}
+          };
+        })()`);
+        assert.notEqual(measured.missing, true, where + ' ' + label + ' control missing: ' + selector);
+        assert.equal(measured.atBottom, true, where + ' ' + label + ' scrollTo did not arrive instantly (y ' + measured.beforeY + ', max ' + measured.maxY + ')');
+        assert.ok(measured.beforeTop < 0, where + ' ' + label + ' must start below the previous heading');
+        assert.equal(measured.section, destination, where + ' ' + label);
+        assert.equal(measured.heading, headings[destination], where + ' ' + label + ' heading');
+        assert.equal(measured.focused, true, where + ' ' + label + ' did not focus the heading (' + measured.activeTag + '#' + measured.activeId + ')');
+        assert.equal(measured.focusVisible, false, where + ' ' + label + ' shows a focus ring after pointer activation');
+        assert.equal(measured.tabindex, '-1', where + ' ' + label + ' heading is not programmatically focusable');
+        assert.equal(measured.aria, destination, where + ' ' + label + ' aria-current');
+        assert.ok(measured.headingTop >= -0.5 && measured.headingTop < 2, where + ' ' + label + ' heading landed at ' + measured.headingTop);
+        const instant = await assertStill(label, measured.motion);
+        steps.push({ kind: 'jump', label, section: destination, focusedHeading: true, atTop: true, instant, scrollBehavior: 'auto', unanimated: true, focusVisible: false });
+      };
+
+      await jump('#products [data-add]', 'cart', 'Discover to Checkout');
+      assert.match(await evaluate("document.querySelector('#result').textContent"), /No order was placed\./);
+
+      const preview = await evaluate(`(() => {
+        const beforeY = window.scrollY;
+        document.querySelector('#preview').click();
+        const result = document.querySelector('#result');
+        return {
+          beforeY,
+          scrollY: window.scrollY,
+          section: [...document.querySelectorAll('main section')].find(node => !node.hidden).id,
+          text: result.textContent,
+          motion: ${motionScript}
+        };
+      })()`);
+      assert.equal(preview.section, 'cart', where + ' preview left Checkout');
+      assert.match(preview.text, /No payment or order submission occurred/);
+      assert.doesNotMatch(preview.text, /buy now|place order|payment method|card number/i);
+      steps.push({ kind: 'status', label: 'Checkout preview status', section: 'cart', instant: await assertStill('Checkout preview status', preview.motion), scrollBehavior: 'auto', unanimated: true });
+
+      await jump('#checkoutToRobots', 'robots', 'Checkout to My Robots');
+      assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase, ownership, compatibility or hardware connection/);
+      await jump('#openSkillsFromRobots', 'skills', 'My Robots to Skills');
+      await jump('#openServicesFromSkills', 'services', 'Skills to Services');
+      await jump('[data-tab=store]', 'store', 'Bottom nav to Discover');
+      await jump('[data-tab=cart]', 'cart', 'Bottom nav to Checkout');
+      await jump('[data-tab=robots]', 'robots', 'Bottom nav to My Robots');
+      await jump('[data-tab=skills]', 'skills', 'Bottom nav to Skills');
+      await jump('[data-tab=services]', 'services', 'Bottom nav to Services');
+
+      const skipJump = await evaluate(`(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const maxY = Math.max(0, document.documentElement.scrollHeight - document.documentElement.clientHeight);
+        const beforeY = window.scrollY;
+        document.querySelector('.skip-link').click();
+        const main = document.getElementById('main-content');
+        const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+        return {
+          beforeY, maxY, atBottom: Math.abs(beforeY - maxY) <= 1,
+          scrollY: window.scrollY,
+          activeId: document.activeElement && document.activeElement.id,
+          mainTop: main.getBoundingClientRect().top,
+          section: section.id,
+          hash: location.hash,
+          motion: ${motionScript}
+        };
+      })()`);
+      assert.equal(skipJump.atBottom, true, where + ' skip link was not activated from the bottom');
+      assert.ok(skipJump.beforeY > 20, where + ' skip link page was already at the top');
+      assert.equal(skipJump.activeId, 'main-content', where + ' skip link focused ' + skipJump.activeId);
+      assert.equal(skipJump.section, 'services', where + ' skip link changed section to ' + skipJump.section);
+      assert.equal(skipJump.hash, '#main-content', where + ' skip link hash');
+      assert.ok(skipJump.mainTop >= -1 && skipJump.mainTop <= 2, where + ' skip link landed main at ' + skipJump.mainTop);
+      assert.ok(skipJump.scrollY < skipJump.beforeY, where + ' skip link did not jump upward');
+      steps.push({ kind: 'skip-jump', section: 'services', focusedMain: true, atTop: true, instant: await assertStill('Skip link jump', skipJump.motion), scrollBehavior: 'auto', unanimated: true });
+      return steps;
+    };
+
+    const runs = new Map();
+    for (const motion of ['reduce', 'no-preference']) {
+      for (const [width, height] of [[320, 640], [390, 844]]) {
+        runs.set(motion + ' ' + width, await runJourney(width, height, motion));
+      }
+    }
+    for (const width of [320, 390]) {
+      assert.deepEqual(runs.get('reduce ' + width), runs.get('no-preference ' + width), width + 'px reduced motion changed the instant jump behavior');
+    }
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});
