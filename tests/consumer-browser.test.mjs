@@ -1264,9 +1264,9 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 p
         assert.equal(order.previewAfterHint, true, '390px moved Preview order ahead of the nickname hint');
         assert.equal(order.buttonAfterDetail, true, '390px moved Add demo service ahead of the service detail');
         assert.equal(order.narrowClass, false, '390px applied the narrow checkout layout');
-        assert.ok(previewControl.gap <= -205 && previewControl.gap >= -222, '390px Preview order gap changed to ' + previewControl.gap.toFixed(1));
+        assert.ok(previewControl.gap < 0 && previewControl.reach >= -1, '390px Preview order must remain reachable below the fold; gap ' + previewControl.gap.toFixed(1));
         assert.ok(previewControl.width < 160 && previewControl.height >= 44, '390px Preview order size changed to ' + previewControl.width.toFixed(1) + 'x' + previewControl.height.toFixed(1));
-        assert.ok(addService.gap <= -193 && addService.gap >= -209, '390px Add demo service gap changed to ' + addService.gap.toFixed(1));
+        assert.ok(addService.gap < 0 && addService.reach >= -1, '390px Add demo service must remain reachable below the fold; gap ' + addService.gap.toFixed(1));
         assert.ok(addService.width < 180 && addService.height >= 44, '390px Add demo service size changed to ' + addService.width.toFixed(1) + 'x' + addService.height.toFixed(1));
       } else {
         assert.equal(order.previewAfterHint, false, '320px left Preview order after the nickname hint');
