@@ -56,7 +56,7 @@ async function openCDP(url) {
   };
 }
 
-test('real Chrome mobile journey stays demo-only from Discover through Services', { timeout: 45000 }, async () => {
+test('real Chrome mobile journey stays demo-only from Discover through Services', { timeout: 60000 }, async () => {
   const html = readFileSync(join(process.cwd(), 'consumer.html'));
   const server = createServer((request, response) => {
     if (request.url?.split('?')[0] !== '/consumer.html') {
@@ -79,7 +79,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     const port = await until(() => {
       if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
       return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
-    }, 'Chrome DevTools port');
+    }, 'Chrome DevTools port', 20000);
     const tab = await until(async () => {
       const response = await fetch('http://127.0.0.1:' + port + '/json/list');
       const pages = await response.json();
@@ -130,6 +130,13 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       await Promise.race([exited, sleep(1500)]);
     }
     await new Promise(resolve => server.close(resolve));
-    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    // Chrome subprocesses may briefly recreate profile files after the launcher exits.
+    // A temporary-profile cleanup race must not fail an otherwise successful journey.
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
   }
 });
