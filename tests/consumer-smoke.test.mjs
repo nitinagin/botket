@@ -2498,3 +2498,37 @@ test('mobile filled Skills and Services keep profile pickers and preview actions
   assert.match(app, /eligibility and compatibility are unverified/);
   assert.doesNotMatch(skills + services, /payment method|place order|buy now|card number|book a service|install now/i);
 });
+
+test('mobile bottom navigation keeps 44px targets, the current section, and a visible focus style', () => {
+  const nav = page.match(/<nav class="tabs"[\s\S]*?<\/nav>/)?.[0];
+  assert.ok(nav, 'Expected the platform section navigation');
+  const labels = ['Discover', 'Checkout', 'My Robots', 'Skills', 'Services'];
+  const buttons = [...nav.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];
+  assert.deepEqual(buttons.map(([, , body]) => body.match(/class="nav-label">([^<]+)/)?.[1]), labels);
+  assert.ok(buttons.every(([, attrs]) => /type="button"/.test(attrs)), 'Each nav item is a button hit target');
+  assert.equal([...nav.matchAll(/aria-current="page"/g)].length, 1, 'Exactly one section is current on first paint');
+  assert.match(buttons[0][1], /data-tab="store"/);
+  assert.match(buttons[0][1], /aria-current="page"/);
+  assert.match(app, /document\.querySelectorAll\('\[data-tab\]'\)\.forEach\(b=>b\.onclick=\(\)=>show\(b\.dataset\.tab,true\)\)/);
+  assert.match(app, /b\.classList\.toggle\('active',active\);if\(active\)b\.setAttribute\('aria-current','page'\);else b\.removeAttribute\('aria-current'\)/);
+
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  const tabsRule = mobile.match(/\.tabs \{[^}]+\}/)?.[0];
+  const buttonRule = mobile.match(/\.tabs button \{[^}]+\}/)?.[0];
+  assert.ok(tabsRule && buttonRule, 'Expected the fixed mobile navigation rules');
+  assert.match(tabsRule, /display: grid/);
+  assert.match(tabsRule, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(buttonRule, /box-sizing: border-box/);
+  assert.match(buttonRule, /width: 100%/);
+  const columns = Number(tabsRule.match(/repeat\((\d+), minmax\(0, 1fr\)\)/)?.[1]);
+  const gap = Number(tabsRule.match(/gap: (\d+)px/)?.[1]);
+  const side = Number(tabsRule.match(/max\((\d+)px, env\(safe-area-inset-left\)\)/)?.[1]);
+  const minHeight = Number(buttonRule.match(/min-height: (\d+)px/)?.[1]);
+  const itemWidth = (390 - side * 2 - gap * (columns - 1)) / columns;
+  assert.equal(columns, 5);
+  assert.ok(minHeight >= 44, 'Nav item min-height is ' + minHeight + 'px');
+  assert.ok(itemWidth >= 44, 'At 390px each nav item is ' + itemWidth.toFixed(1) + 'px wide');
+  assert.match(page, /\.tabs button\.active::after,\.tabs button\[aria-current=page\]::after\{content:"";position:absolute;top:4px;left:8px;right:8px;height:4px;border-radius:2px;background:#111;pointer-events:none\}/);
+  assert.match(mobile, /\.tabs button:focus-visible \{\s*outline: 3px solid #111;\s*outline-offset: 1px;\s*\}/);
+  assert.doesNotMatch(buttonRule, /outline:\s*none|outline:\s*0/);
+});
