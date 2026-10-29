@@ -282,3 +282,243 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     }
   }
 });
+
+test('mobile section handoffs open at the heading for pointer and keyboard users', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-handoff-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelector('#products [data-add]') !== null && matchMedia('(prefers-reduced-motion: reduce)').matches"), 'Discover ready under reduced motion');
+
+    const handoff = async (selector, destination, label) => {
+      const measured = await evaluate(`(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        const beforeTop = document.querySelector('main section:not([hidden]) h2').getBoundingClientRect().top;
+        const control = document.querySelector(${JSON.stringify(selector)});
+        if (!control || control.hidden || getComputedStyle(control).display === 'none') return { missing: true };
+        control.click();
+        const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+        const heading = section.querySelector('h2');
+        const rect = heading.getBoundingClientRect();
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const header = document.querySelector('header');
+        const headerRect = header.getBoundingClientRect();
+        const active = document.activeElement;
+        const headingText = heading.textContent.trim();
+        const lives = [...section.querySelectorAll('[aria-live], [role="status"], [role="alert"]')];
+        return {
+          beforeTop,
+          section: section.id,
+          headingTop: rect.top,
+          headingBottom: rect.bottom,
+          navTop: nav.top,
+          headerPosition: getComputedStyle(header).position,
+          headerBottom: headerRect.bottom,
+          activeTag: active.tagName,
+          sameHeading: active === heading,
+          tabindex: heading.getAttribute('tabindex'),
+          focusVisible: active.matches(':focus-visible'),
+          aria: [...document.querySelectorAll('[aria-current="page"]')].map(node => node.dataset.tab),
+          inLive: Boolean(heading.closest('[aria-live], [role="status"], [role="alert"]')),
+          liveDuplicate: lives.some(node => node.textContent.trim() === headingText),
+          scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior
+        };
+      })()`);
+      assert.notEqual(measured.missing, true, label + ' control missing: ' + selector);
+      assert.ok(measured.beforeTop < 0, label + ' must start mid-page, heading top was ' + measured.beforeTop.toFixed(1));
+      assert.equal(measured.section, destination, label);
+      assert.equal(measured.activeTag, 'H2', label + ' focus stayed on ' + measured.activeTag);
+      assert.equal(measured.sameHeading, true, label + ' focused a different heading');
+      assert.equal(measured.tabindex, '-1', label + ' heading is not programmatically focusable');
+      assert.ok(measured.headingTop >= 0, label + ' heading is clipped above the viewport by ' + (-measured.headingTop).toFixed(1) + 'px');
+      assert.ok(measured.headingBottom <= measured.navTop, label + ' heading is behind the bottom nav by ' + (measured.headingBottom - measured.navTop).toFixed(1) + 'px');
+      if (measured.headerPosition === 'fixed' || measured.headerPosition === 'sticky') {
+        assert.ok(measured.headingTop >= measured.headerBottom - 0.5, label + ' heading is under the sticky header');
+      }
+      assert.equal(measured.focusVisible, false, label + ' shows a focus ring after pointer activation');
+      assert.deepEqual(measured.aria, [destination], label + ' aria-current');
+      assert.equal(measured.inLive, false, label + ' announces the heading from a live region as well as focus');
+      assert.equal(measured.liveDuplicate, false, label + ' live region repeats the heading');
+      assert.equal(measured.scrollBehavior, 'auto', label + ' should not smooth-scroll');
+    };
+
+    await handoff('[data-tab=cart]', 'cart', 'Bottom nav Discover to Checkout');
+    await handoff('[data-tab=robots]', 'robots', 'Bottom nav Checkout to My Robots');
+    await handoff('[data-tab=skills]', 'skills', 'Bottom nav My Robots to Skills');
+    await handoff('[data-tab=services]', 'services', 'Bottom nav Skills to Services');
+    await handoff('[data-tab=store]', 'store', 'Bottom nav Services to Discover');
+
+    await handoff('[data-tab=cart]', 'cart', 'Empty Checkout');
+    await handoff('#items [data-cart-browse]', 'store', 'Empty Checkout browse robots');
+    await handoff('[data-tab=cart]', 'cart', 'Return to empty Checkout');
+    await handoff('#items [data-cart-robots]', 'robots', 'Empty Checkout open My Robots');
+    await handoff('#openDiscoverFromRobots', 'store', 'Empty My Robots explore concepts');
+    await handoff('[data-tab=robots]', 'robots', 'Return to empty My Robots');
+    await handoff('#openSkillsFromRobots', 'skills', 'Empty My Robots explore skills');
+    await handoff('[data-tab=robots]', 'robots', 'Return to empty My Robots list');
+    await handoff('#myrobots button', 'store', 'Empty My Robots list recovery');
+    await handoff('[data-tab=skills]', 'skills', 'Bottom nav to Skills recovery');
+    await handoff('#openServicesFromSkills', 'services', 'Skills to Services');
+    await handoff('#openSkillsFromServices', 'skills', 'Services recovery to Skills');
+    await handoff('#openServicesFromSkills', 'services', 'Return to Services');
+    await handoff('#openRobotsFromServices', 'robots', 'Services recovery to My Robots');
+    await handoff('[data-tab=skills]', 'skills', 'Return to Skills');
+    await handoff('#openRobotsFromSkills', 'robots', 'Skills manage robots recovery');
+
+    await handoff('[data-tab=services]', 'services', 'Open Services before adding a preview');
+    await handoff('#servicecards [data-add]', 'cart', 'Services add to Checkout');
+    await evaluate("document.querySelector('#preview').click()");
+    await handoff('#checkoutToRobots', 'services', 'Service-only Checkout continue');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /no service was booked and no payment was taken/i);
+
+    await handoff('[data-tab=store]', 'store', 'Discover before adding a concept');
+    await handoff('#products [data-add]', 'cart', 'Discover add to Checkout');
+    await handoff('#browseFromCheckout', 'store', 'Checkout continue browsing');
+    await handoff('#reviewDiscoverCart', 'cart', 'Discover review demo cart');
+    await evaluate("document.querySelector('#preview').click()");
+    await handoff('#checkoutToRobots', 'robots', 'Checkout continue to My Robots');
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase/i);
+    await handoff('#openSkillsFromRobots', 'skills', 'My Robots explore skill previews');
+    await handoff('#openServicesFromSkills', 'services', 'Filled Skills to Services');
+
+    const profile = await evaluate(`(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      document.querySelector('[data-tab=store]').click();
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      document.querySelector('#products [data-robot]').click();
+      const active = document.activeElement;
+      const rect = active.getBoundingClientRect();
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+      return {
+        section: section.id,
+        id: active.id,
+        top: rect.top,
+        bottom: rect.bottom,
+        navTop: nav.top,
+        focusVisible: active.matches(':focus-visible'),
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches
+      };
+    })()`);
+    assert.equal(profile.section, 'robots', 'Create demo profile opens My Robots');
+    assert.equal(profile.id, 'robotBrand', 'Create demo profile lands in the brand field');
+    assert.ok(profile.top >= 0 && profile.bottom <= profile.navTop, 'Brand field is outside the visible area above the bottom nav');
+    assert.equal(profile.focusVisible, false, 'Create demo profile shows a focus ring after pointer activation');
+    assert.equal(profile.reduced, true);
+
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    const press = async key => {
+      const spec = key === 'Enter'
+        ? { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, text: '\r' }
+        : { key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32, text: ' ' };
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', ...spec });
+      if (key === ' ') await send('Input.dispatchKeyEvent', { type: 'char', ...spec });
+      const { text, ...rest } = spec;
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', ...rest });
+    };
+    const keyboardLanding = async (selector, destination, key, label) => {
+      await evaluate(`(() => { window.scrollTo(0, document.documentElement.scrollHeight); document.querySelector(${JSON.stringify(selector)}).focus(); })()`);
+      await press(key);
+      await sleep(50);
+      const measured = await evaluate(`(() => {
+        const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+        const heading = section.querySelector('h2');
+        const rect = heading.getBoundingClientRect();
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const active = document.activeElement;
+        return {
+          section: section.id,
+          sameHeading: active === heading,
+          headingTop: rect.top,
+          headingBottom: rect.bottom,
+          navTop: nav.top,
+          focusVisible: active.matches(':focus-visible'),
+          aria: document.querySelector('[aria-current="page"]')?.dataset.tab
+        };
+      })()`);
+      assert.equal(measured.section, destination, label);
+      assert.equal(measured.sameHeading, true, label + ' did not move focus to the heading');
+      assert.ok(measured.headingTop >= 0 && measured.headingBottom <= measured.navTop, label + ' heading is not fully visible');
+      assert.equal(measured.focusVisible, true, label + ' keyboard focus has no visible indicator');
+      assert.equal(measured.aria, destination, label + ' aria-current');
+    };
+    await keyboardLanding('[data-tab=services]', 'services', ' ', 'Space on Services nav');
+    await keyboardLanding('#openRobotsFromServices', 'robots', 'Enter', 'Enter on Services manage robots');
+
+    const box = await evaluate(`(() => { const rect = document.querySelector('[data-tab=store]').getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }; })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    await sleep(50);
+    const pointer = await evaluate(`(() => {
+      const section = [...document.querySelectorAll('main section')].find(node => !node.hidden);
+      const heading = section.querySelector('h2');
+      const rect = heading.getBoundingClientRect();
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      return {
+        section: section.id,
+        sameHeading: document.activeElement === heading,
+        focusVisible: document.activeElement.matches(':focus-visible'),
+        headingTop: rect.top,
+        headingBottom: rect.bottom,
+        navTop: nav.top
+      };
+    })()`);
+    assert.equal(pointer.section, 'store');
+    assert.equal(pointer.sameHeading, true);
+    assert.equal(pointer.focusVisible, false, 'Mouse activation shows a focus ring on the heading');
+    assert.ok(pointer.headingTop >= 0 && pointer.headingBottom <= pointer.navTop);
+  } finally {
+    cdp?.socket.close();
+    if (chrome && chrome.exitCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      chrome.kill();
+      await Promise.race([exited, sleep(1500)]);
+    }
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+});
