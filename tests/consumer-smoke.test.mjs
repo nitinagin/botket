@@ -2739,7 +2739,7 @@ test('narrow phones put primary demo actions ahead of long explanations without 
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   const narrowBlocks = [...mobile.matchAll(/@media \(max-width: 359px\) \{([\s\S]*?)\n  \}/g)].map(match => match[1]);
   assert.equal(narrowBlocks.length, 2, 'Expected the Discover tightening block and the primary-action block');
-  assert.match(narrowBlocks[1], /#services #serviceRobotContext \{ margin: 0; padding: 6px 8px; line-height: 1\.25; \}/);
+  assert.match(narrowBlocks[1], /#services #serviceRobotContext \{ margin: 0; padding: 4px 8px; line-height: 1\.25; \}/);
   assert.match(narrowBlocks[1], /#cart > \.card\.narrow-preview-first > p:has\(#preview\) \{ margin: 8px 0 0; \}/);
   assert.doesNotMatch(mobile.slice(0, mobile.indexOf('@media (max-width: 359px)')), /narrow-preview-first|line-height: 1\.25/);
   assert.match(mobile, /#services > \.grid \{ margin-top: 8px; \}/);
