@@ -280,7 +280,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await evaluate("window.confirm = () => true; document.querySelector('#clearCart').click()");
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Confirm empties the demo cart');
     assert.equal(await evaluate("document.querySelector('#preview').disabled"), true, 'Empty demo cart cannot preview an order');
-    assert.match(await evaluate("document.querySelector('#result').textContent"), /Cart cleared\\. No order was placed/);
+    assert.match(await evaluate("document.querySelector('#result').textContent"), /Cart cleared\. No order was placed/);
 
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
     await until(() => evaluate("document.querySelector('#profileCount')?.textContent.startsWith('0 of 30')"), 'deleted demo profile stays deleted after reload');
