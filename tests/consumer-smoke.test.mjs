@@ -3094,3 +3094,84 @@ test('reduced motion keeps section jumps, the skip link, cards, buttons, and sta
   assert.doesNotMatch(style, /\.status[^{]*\{[^}]*(?:transition|animation)\s*:/);
   assert.doesNotMatch(style, /button[^{]*\{[^}]*(?:transition|animation)\s*:/);
 });
+
+test('mobile consumer text and field boundaries meet WCAG 2.2 AA contrast', () => {
+  const channel = value => {
+    const s = value / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const rgb = hex => {
+    const raw = hex.slice(1);
+    const full = raw.length === 3 ? raw.replace(/./g, digit => digit + digit) : raw;
+    return [0, 2, 4].map(index => parseInt(full.slice(index, index + 2), 16));
+  };
+  const contrast = (foreground, background) => {
+    const hi = Math.max(lum(rgb(foreground)), lum(rgb(background)));
+    const lo = Math.min(lum(rgb(foreground)), lum(rgb(background)));
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const assertContrast = (foreground, background, minimum, label) => {
+    const ratio = contrast(foreground, background);
+    assert.ok(ratio >= minimum, label + ': ' + foreground + ' on ' + background + ' is ' + ratio.toFixed(2) + ':1, needs ' + minimum + ':1');
+  };
+
+  assert.match(page, /body\{background:#fffdf5;color:#111\}/);
+  assert.match(page, /\.muted\{color:#68786d\}/);
+  assert.match(page, /\.hint\{font-size:13px;color:#627468\}/);
+  assert.match(page, /\.category\{font-size:13px;color:#496653;font-weight:650\}/);
+  assert.match(page, /\.status\{font-size:13px;color:#80601c;background:#fff3d8;/);
+  assert.match(page, /\.tabs button\{background:#e4efe7\}/);
+  assert.match(page, /\.tabs button\.active,\.buy\{background:#10b847;color:#111\}/);
+  assert.match(page, /\.store-filters button\{background:#e4efe7\}/);
+  assert.match(page, /\.store-filters button\[aria-pressed=true\]\{background:#ffdb23;color:#111\}/);
+  assert.match(page, /\.cart-row button\{background:#f2e8e8;color:#6b2626;/);
+  assert.match(page, /\.cart-actions button\{background:#e4efe7;color:#193321;/);
+  assert.match(page, /\.concept-card\{[^}]*background:#fff\}/);
+  assert.match(page, /\.concept-label\{[^}]*font-size:13px;font-weight:800;/);
+  assert.match(page, /\.concept-price\{[^}]*background:#ffdb23;font-size:1\.2rem;font-weight:900\}/);
+  assert.match(page, /\.academy-note\{background:#edf7ef;/);
+  assert.match(page, /input,select\{[^}]*border:1px solid #8a8a8a;[^}]*background:#fff;color:#111\}/);
+  assert.match(page, /input::placeholder,input:disabled::placeholder\{color:#616b66;opacity:1\}/);
+  assert.match(page, /input:disabled,select:disabled,#skillcards button:disabled\{opacity:1;color:#111;background:#efefef;-webkit-text-fill-color:#111\}/);
+  assert.match(page, /<strong style="color:#0fa741;font-size:25px">BOTKET<\/strong>/);
+  assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
+  assert.match(page, /\.tabs button:focus-visible\{outline:3px solid #111;outline-offset:2px\}/);
+  assert.match(page, /\.next-step:focus-visible\{outline:3px solid #111;outline-offset:2px\}/);
+  assert.doesNotMatch(page, /#6b7d70|border:1px solid #ccc|color:#10b847/);
+
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.doesNotMatch(mobile, /::placeholder|:disabled|\.hint\{|color:#627468|color:#616b66|color:#0fa741|#6b7d70|#8a8a8a/);
+  assert.match(mobile, /\.tabs button:focus-visible \{\s*outline: 3px solid #111;\s*outline-offset: 1px;\s*\}/);
+
+  const normal = [
+    ['#68786d', '#fffdf5', 'muted demo copy on the page'],
+    ['#68786d', '#ffffff', 'muted demo copy on a card'],
+    ['#627468', '#fffdf5', 'hint text on the page'],
+    ['#627468', '#ffffff', 'hint text on a card'],
+    ['#496653', '#ffffff', 'category chip text'],
+    ['#80601c', '#fff3d8', 'demo status badge'],
+    ['#111111', '#fffdf5', 'body text, empty states, and nav labels on the page'],
+    ['#111111', '#ffffff', 'body text and concept labels on white'],
+    ['#111111', '#edf7ef', 'service demo note'],
+    ['#111111', '#e4efe7', 'inactive nav labels and category chips'],
+    ['#111111', '#10b847', 'active nav, buy, and disabled buy labels'],
+    ['#111111', '#ffdb23', 'selected chip and illustrative price'],
+    ['#111111', '#efefef', 'disabled fields and Install unavailable'],
+    ['#6b2626', '#f2e8e8', 'cart remove label'],
+    ['#193321', '#e4efe7', 'cart action label'],
+    ['#616b66', '#ffffff', 'placeholder on an enabled field'],
+    ['#616b66', '#efefef', 'placeholder on a disabled field']
+  ];
+  for (const [foreground, background, label] of normal) assertContrast(foreground, background, 4.5, label);
+
+  assertContrast('#0fa741', '#ffffff', 3, 'footer wordmark (25px)');
+  assertContrast('#8a8a8a', '#fffdf5', 3, 'field border against the page');
+  assertContrast('#8a8a8a', '#ffffff', 3, 'field border against white');
+  for (const background of ['#fffdf5', '#ffffff', '#ffdb23']) {
+    assertContrast('#1b874e', background, 3, 'green focus ring on ' + background);
+  }
+  for (const background of ['#fffdf5', '#ffffff', '#e4efe7', '#10b847', '#ffdb23']) {
+    assertContrast('#111111', background, 3, 'black focus ring on ' + background);
+  }
+});
