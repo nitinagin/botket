@@ -45,8 +45,14 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
   assert.match(page, /scroll-margin-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\)/);
 });
 
-test('buttons, fields, and selects keep a 3px keyboard focus ring', () => {
-  assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
+test('buttons, fields, selects, and links keep a 3px keyboard focus ring', () => {
+  assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
+  const hrefs = [...page.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map(([, href]) => href);
+  assert.deepEqual(hrefs, ['#main-content', 'academy.html']);
+  assert.doesNotMatch(app, /createElement\((['"])a\1\)/);
+  assert.match(page, /\.skip-link\{[^}]*position:absolute;[^}]*top:-80px;[^}]*z-index:200/);
+  assert.match(page, /\.skip-link:focus-visible\{top:12px\}/);
+  assert.doesNotMatch(page, /a:focus(?:-visible)?\{[^}]*outline:\s*(?:none|0)\b/);
 });
 
 test('mobile bottom navigation keeps whole labels, a non-color current section and safe-area insets', () => {
