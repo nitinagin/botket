@@ -222,6 +222,16 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
     assert.equal(await evaluate("document.querySelector('#servicecards [data-add]') !== null"), true);
     assert.match(await evaluate("document.querySelector('#services > p.muted').textContent"), /No bookings/);
+
+    // Demo robot profiles are local browser data, unlike the ephemeral demo cart.
+    // A reload must restore the profile without implying a purchase or device link.
+    await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
+    await until(() => evaluate("document.querySelector('#store')?.hidden === false && document.querySelector('#profileCount')?.textContent.includes('1 of 30')"), 'saved demo profile restored after reload');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Demo cart must not become a persisted order');
+    await evaluate("document.querySelector('[data-tab=robots]').click()");
+    assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Browser Test Robot/);
+    assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Example Maker/);
+    assert.match(await evaluate("document.querySelector('#robots > p.muted').textContent"), /does not verify ownership or connect hardware/);
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {
