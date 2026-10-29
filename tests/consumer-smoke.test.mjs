@@ -2416,3 +2416,47 @@ test('mobile one-item Checkout keeps Clear all fully above the fixed bottom nav'
   assert.match(page, /This is an order preview, not a real checkout/);
   assert.doesNotMatch(page, /payment method|place order|buy now|card number/i);
 });
+
+test('mobile filled My Robots keeps profile actions, handoffs, and the profile form at least 44px', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px filled My Robots nickname, brand, model, and profile search were 37px tall, and Save, Discard, Clear search, Clear all, the Services handoff, Remove, and Review demo cart were 39px/);
+  assert.match(mobile, /#robots #robotNickname,\s*#robots #robotBrand,\s*#robots #robotModel,\s*#robots #saveDemoProfile,\s*#robots #clearRobotDraft,\s*#robots #profileSearch,\s*#robots #clearProfileSearch,\s*#robots #clearProfiles,\s*#robots #myrobots button:not\(\.next-step\),\s*#robots #reviewRobotsCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  const skills = robots.indexOf('id="openSkillsFromRobots"');
+  const nickname = robots.indexOf('id="robotNickname"');
+  const brand = robots.indexOf('id="robotBrand"');
+  const model = robots.indexOf('id="robotModel"');
+  const save = robots.indexOf('id="saveDemoProfile"');
+  const discard = robots.indexOf('id="clearRobotDraft"');
+  const search = robots.indexOf('id="profileSearch"');
+  const clearSearch = robots.indexOf('id="clearProfileSearch"');
+  const clearAll = robots.indexOf('id="clearProfiles"');
+  const list = robots.indexOf('id="myrobots"');
+  const review = robots.indexOf('id="reviewRobotsCart"');
+  assert.ok(skills > 0 && skills < nickname && nickname < brand && brand < model && model < save && save < discard && discard < search && search < clearSearch && clearSearch < clearAll && clearAll < list && list < review,
+    'Filled My Robots keeps the skills handoff, profile form, search, and saved-profile actions in reach order');
+  assert.match(robots, /class="buy next-step" id="openSkillsFromRobots">Explore skill previews →/);
+  assert.match(robots, /id="saveDemoProfile" type="submit"[^>]*>Save demo profile/);
+  assert.match(robots, /id="clearRobotDraft" type="button" hidden>Discard unsaved fields/);
+  assert.match(robots, /id="profileSearch" type="search"/);
+  assert.match(robots, /id="clearProfileSearch" hidden aria-label="Clear demo profile search"/);
+  assert.match(robots, /id="clearProfiles" hidden>Clear all demo profiles/);
+  assert.match(robots, /id="reviewRobotsCart" hidden>Review demo cart →/);
+  assert.match(robots, /does not verify ownership or connect hardware/);
+  assert.match(robots, /No serial numbers, warranty, ownership or compatibility verification/);
+
+  assert.match(app, /preview\.className='next-step'/);
+  assert.match(app, /preview\.textContent='Browse generic skills \(demo\) →'/);
+  assert.match(app, /servicesPreview\.textContent='Explore generic service previews \(demo\) →'/);
+  assert.match(app, /servicesPreview\.setAttribute\('aria-label','Explore generic service previews with '/);
+  assert.match(app, /remove\.textContent='Remove profile'/);
+  assert.match(app, /remove\.setAttribute\('data-remove',''\)/);
+  assert.match(app, /clearSearch\.textContent='Clear search'/);
+  assert.match(app, /compatibility not verified/);
+  assert.match(app, /byId\('reviewRobotsCart'\)\.hidden=!cart\.length/);
+  assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=\(\)=>show\('cart'\)/);
+  assert.doesNotMatch(robots, /payment method|place order|buy now|card number|book a service|install now/i);
+});
