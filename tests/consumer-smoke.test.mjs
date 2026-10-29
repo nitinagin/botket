@@ -2343,3 +2343,36 @@ test('mobile Skills keeps My Robots and Services actions above the fixed bottom 
   assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
   assert.doesNotMatch(skills, /install now|compatible with your robot|book a service|payment/i);
 });
+
+test('mobile filled Checkout keeps preview, remove, and Discover actions at least 44px above the bottom nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390px the filled Checkout Preview order and My Robots handoff buttons were 39px tall/);
+  assert.match(mobile, /#cart #preview,\s*#cart #checkoutToRobots \{ box-sizing: border-box; min-height: 44px; min-width: 44px; \}/);
+  assert.match(mobile, /main \{ padding: 20px 16px 116px; \}/);
+  assert.match(mobile, /html \{ scroll-padding-bottom: calc\(116px \+ env\(safe-area-inset-bottom\)\); \}/);
+  assert.match(page, /\.cart-row button\{[^}]*min-height:44px/);
+  assert.match(page, /\.cart-actions button\{[^}]*min-height:44px/);
+
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart, 'Expected the Checkout section');
+  const notice = cart.indexOf('This is an order preview, not a real checkout. No payment, reservation or order submission occurs.');
+  const items = cart.indexOf('id="items"');
+  const browse = cart.indexOf('id="browseFromCheckout"');
+  const preview = cart.indexOf('id="preview"');
+  const handoff = cart.indexOf('id="checkoutToRobots"');
+  const disclaimer = cart.indexOf('No purchase, service booking or ownership verification occurs.');
+  assert.ok(notice > 0 && notice < items && items < browse && browse < preview && preview < handoff && handoff < disclaimer,
+    'Filled checkout keeps the no-payment notice, remove row, Discover return, preview, and My Robots handoff in reach order');
+  assert.match(cart, /id="browseFromCheckout"[^>]*>Continue browsing robot concepts →/);
+  assert.match(cart, /id="preview">Preview order/);
+  assert.match(cart, /id="checkoutToRobots"[^>]*>Continue to My Robots \(demo\) →/);
+  assert.match(page, /remove\.textContent='Remove'/);
+  assert.match(page, /remove\.setAttribute\('data-cart-remove',''\)/);
+  assert.match(page, /byId\('browseFromCheckout'\)\.hidden=!cart\.length/);
+  assert.match(page, /byId\('browseFromCheckout'\)\.textContent=lastBrowseTab==='services'\?'Continue browsing service previews →':'Continue browsing robot concepts →'/);
+  assert.match(page, /byId\('browseFromCheckout'\)\.onclick=\(\)=>show\(lastBrowseTab\)/);
+  assert.match(page, /byId\('checkoutToRobots'\)\.textContent=robotCount\?'Continue to My Robots \(demo\) →':'Return to service previews →'/);
+  assert.match(app, /show\('robots'\);byId\('robotMessage'\)\.textContent='Checkout was a demo preview for '/);
+  assert.match(app, /this does not confirm purchase, ownership, compatibility or hardware connection/);
+  assert.doesNotMatch(cart, /payment method|place order|buy now|card number/i);
+});
