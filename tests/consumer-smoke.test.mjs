@@ -1948,6 +1948,12 @@ test('Skills disabled install buttons identify each preview without claiming com
 });
 
 
+test('demo profile fields opt out of browser autofill to reduce unintended personal data entry', () => {
+  for (const id of ['robotNickname', 'robotBrand', 'robotModel']) {
+    assert.match(page, new RegExp('<input id="' + id + '"[^>]*autocomplete="off"'));
+  }
+});
+
 test('My Robots save action explains browser-local storage and unverified manufacturer registration', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
