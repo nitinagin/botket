@@ -1704,6 +1704,14 @@ test('Discover concept actions and Services demo add buttons have distinct acces
   assert.match(page, /No bookings, service requests or payments are available/);
 });
 
+test('Services warns that demo profile selection does not establish eligibility', () => {
+  const servicesSection = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(servicesSection, 'Expected the Services section');
+  assert.match(servicesSection, /profile selection does not verify eligibility/);
+  assert.match(servicesSection, /No bookings, service requests or payments are available/);
+  assert.match(servicesSection, /id="serviceRobotSelect" aria-describedby="serviceRobotContext"/);
+});
+
 test('Services actions announce the existing unverified eligibility context', () => {
   const serviceLine = app.split('\n').find(line => line.includes("byId('servicecards').innerHTML="));
   assert.ok(serviceLine, 'Expected service preview cards');
