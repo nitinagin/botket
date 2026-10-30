@@ -24,6 +24,20 @@ test('all five navigation buttons point to real sections', () => {
   assert.deepEqual([...sections].sort(), [...expected].sort());
 });
 
+test('all five consumer sections are named screen-reader regions', () => {
+  const sections = [
+    ['store', 'Explore robots'],
+    ['cart', 'Demo checkout'],
+    ['robots', 'My Robots'],
+    ['skills', 'Skills'],
+    ['services', 'Services']
+  ];
+  for (const [id, title] of sections) {
+    assert.match(page, new RegExp('<section id="' + id + '" aria-labelledby="' + id + '-title"'));
+    assert.match(page, new RegExp('<h2 id="' + id + '-title">' + title + '<\\/h2>'));
+  }
+});
+
 test('static HTML element IDs are unique', () => {
   const ids = [...page.matchAll(/<[a-z][^>]*\sid="([^"]+)"/gi)].map(([, id]) => id);
   assert.ok(ids.length > 0);
