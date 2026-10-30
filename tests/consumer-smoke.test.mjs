@@ -1961,6 +1961,16 @@ test('My Robots warns against entering sensitive information in local demo profi
   assert.match(robots, /id="saveDemoProfile" type="submit" aria-describedby="profileCount profilePrivacyNotice"/);
 });
 
+test('My Robots warns at the first profile field before entering sensitive data', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  assert.match(robots, /Create a local demo profile for any robot/);
+  const nickname = robots.match(/<input id="robotNickname"[^>]*>/)?.[0];
+  assert.ok(nickname, 'Expected demo profile nickname input');
+  assert.match(nickname, /aria-describedby="profilePrivacyNotice"/);
+  assert.match(robots, /<p id="profilePrivacyNotice"[^>]*>[^<]*Do not enter serial numbers, account credentials, payment details or other personal information\./);
+});
+
 test('My Robots save action explains browser-local storage and unverified manufacturer registration', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
