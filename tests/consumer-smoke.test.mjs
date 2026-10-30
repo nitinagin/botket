@@ -134,6 +134,21 @@ test('checkout and skills clearly remain demos', () => {
   assert.match(page, /Leave blank to preview as Guest/);
 });
 
+test('checkout preview and follow-up buttons expose the no-payment warning to assistive technology', () => {
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart, 'Expected the demo checkout section');
+  const notice = cart.match(/<p id="checkoutDemoNotice" class="muted">([^<]+)<\/p>/);
+  assert.ok(notice, 'Expected the visible checkout disclaimer');
+  assert.match(notice[1], /order preview, not a real checkout/i);
+  assert.match(notice[1], /No payment, reservation or order submission occurs/i);
+  for (const id of ['preview', 'checkoutToRobots']) {
+    const button = cart.match(new RegExp('<button\\b[^>]*\\bid="' + id + '"[^>]*>'))?.[0];
+    assert.ok(button, 'Missing checkout action: ' + id);
+    assert.match(button, /aria-describedby="checkoutDemoNotice"/,
+      id + ' must reference the existing visible demo disclaimer');
+  }
+});
+
 test('demo cart guards and section handoffs remain present', () => {
   assert.match(app, /cart\.some\(item=>item\.id===x\.id\)/);
   assert.match(app, /cart\.length>=20/);
