@@ -276,6 +276,16 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#robots').hidden"), false);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase/);
 
+    // Verify Chrome exposes the local-only privacy notice before saving a demo profile.
+    const profileSaveAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && node.name?.value === 'Save demo profile');
+    assert.equal(profileSaveAX.length, 1, 'The demo profile save action must appear in the accessibility tree');
+    assert.match(profileSaveAX[0].description?.value ?? '', /Saved only in this browser/i,
+      'Save demo profile must announce local-only storage');
+    assert.match(profileSaveAX[0].description?.value ?? '', /not registered with a manufacturer/i,
+      'Save demo profile must not imply manufacturer registration');
+
     await evaluate("document.querySelector('#robotNickname').value='Browser Test Robot'; document.querySelector('#robotBrand').value='Example Maker'; document.querySelector('#robotModel').value='Model A'; document.querySelector('#registerRobot').requestSubmit()");
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /1 of 30/);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Compatibility not verified; no device connected/);
