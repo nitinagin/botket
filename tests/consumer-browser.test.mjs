@@ -56,6 +56,41 @@ async function openCDP(url) {
   };
 }
 
+// Close the browser before deleting its profile: Chrome subprocesses can otherwise
+// recreate files while rmSync is traversing the directory (ENOTEMPTY in CI).
+async function closeChromeAndCleanup(chrome, cdp, server, dir) {
+  try {
+    if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
+      const exited = new Promise(resolve => chrome.once('exit', resolve));
+      // Browser.close gives Chrome a chance to stop its profile writers cleanly.
+      // Use an untracked CDP request so a closing socket cannot leave a pending timer.
+      try {
+        if (cdp?.socket.readyState === WebSocket.OPEN) {
+          cdp.socket.send(JSON.stringify({ id: 0, method: 'Browser.close' }));
+        }
+      } catch { /* Fall back to terminating the process. */ }
+      await Promise.race([exited, sleep(1800)]);
+      if (chrome.exitCode === null && chrome.signalCode === null) {
+        chrome.kill('SIGTERM');
+        await Promise.race([exited, sleep(2000)]);
+      }
+      if (chrome.exitCode === null && chrome.signalCode === null) {
+        chrome.kill('SIGKILL');
+        await Promise.race([exited, sleep(1000)]);
+      }
+    }
+  } finally {
+    cdp?.socket.close();
+    await new Promise(resolve => server.close(resolve));
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 15, retryDelay: 250 });
+    } catch (error) {
+      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+      console.warn('Chrome temporary profile cleanup deferred:', error.code);
+    }
+  }
+}
+
 test('real Chrome mobile journey stays demo-only from Discover through Services', { timeout: 60000 }, async () => {
   const root = process.cwd();
   const assets = {
@@ -313,21 +348,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Cleared demo cart remains ephemeral');
 
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    // Chrome subprocesses may briefly recreate profile files after the launcher exits.
-    // A temporary-profile cleanup race must not fail an otherwise successful journey.
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -557,19 +578,7 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
     assert.equal(pointer.focusVisible, false, 'Mouse activation shows a focus ring on the heading');
     assert.ok(pointer.headingTop >= 0 && pointer.headingBottom <= pointer.navTop);
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -721,19 +730,7 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
     assertCards(await show(320, 640), '320x640 in demo cart', inCart);
     assertCards(await show(390, 844), '390x844 in demo cart', inCart);
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -961,19 +958,7 @@ test('empty Checkout, My Robots, Skills, and Services stay inside 320, 390, and 
     await openWidth(390, 844);
     await openWidth(430, 932);
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -1311,19 +1296,7 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and
     await runJourney(390, 844);
     await runJourney(430, 932);
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -1601,19 +1574,7 @@ test('320px section handoffs start at the heading and keep the next demo action 
     assert.ok(keyboard.headingBottom <= keyboard.navTop);
     assert.equal(keyboard.overflow, 0);
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -1899,19 +1860,7 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320, 390 a
       assert.deepEqual(missing, [], width + 'x' + height + ' did not Tab to ' + missing.join(', '));
     }
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
 
@@ -2195,18 +2144,6 @@ test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services j
       assert.deepEqual(runs.get('reduce ' + width), runs.get('no-preference ' + width), width + 'px reduced motion changed the instant jump behavior');
     }
   } finally {
-    cdp?.socket.close();
-    if (chrome && chrome.exitCode === null) {
-      const exited = new Promise(resolve => chrome.once('exit', resolve));
-      chrome.kill();
-      await Promise.race([exited, sleep(1500)]);
-    }
-    await new Promise(resolve => server.close(resolve));
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    } catch (error) {
-      if (!['ENOTEMPTY', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
-      console.warn('Chrome temporary profile cleanup deferred:', error.code);
-    }
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
