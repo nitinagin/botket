@@ -355,9 +355,17 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       .filter(node => !node.ignored && node.role?.value === 'button'
         && /service preview.*no booking/i.test(node.name?.value ?? ''));
     assert.equal(serviceAX.length, 2, 'Both service preview actions must appear in the Chrome accessibility tree');
+    assert.equal(serviceAX.filter(node => /already in demo cart/i.test(node.name?.value ?? '')).length, 1,
+      'The disabled In demo cart service action must remain accessible');
+    assert.equal(serviceAX.filter(node => /^Add /i.test(node.name?.value ?? '')).length, 1,
+      'The available Add demo service action must remain accessible');
     for (const node of serviceAX) {
       assert.match(node.description?.value ?? '', /eligibility and compatibility are unverified/i,
         'Service preview action must expose its unverified eligibility context to assistive technology');
+      assert.match(node.description?.value ?? '', /profile selection does not verify eligibility/i,
+        'Service action must disclose that demo profile selection does not verify eligibility');
+      assert.match(node.description?.value ?? '', /No bookings, service requests or payments are available/i,
+        'Service action must disclose that bookings, requests and payments are unavailable');
     }
     assert.match(await evaluate("document.querySelector('#services > p.muted').textContent"), /No bookings/);
     await evaluate('window.scrollTo(0, 0)');
