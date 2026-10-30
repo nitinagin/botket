@@ -398,6 +398,7 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
     await until(() => evaluate("document.querySelector('#products [data-add]') !== null && matchMedia('(prefers-reduced-motion: reduce)').matches"), 'Discover ready under reduced motion');
 
+    const verifiedAXRegions = new Set();
     const handoff = async (selector, destination, label) => {
       const measured = await evaluate(`(() => {
         window.scrollTo(0, document.documentElement.scrollHeight);
@@ -445,6 +446,18 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
         store: 'Explore robots', cart: 'Demo checkout', robots: 'My Robots',
         skills: 'Skills', services: 'Services'
       }[destination], label + ' region accessible name');
+      // Verify the actual Chrome accessibility tree, not just DOM aria-labelledby.
+      // Sample each workflow destination once to keep this journey's runtime bounded.
+      if (!verifiedAXRegions.has(destination)) {
+        const axTree = await send('Accessibility.getFullAXTree');
+        const workflowNames = ['Explore robots', 'Demo checkout', 'My Robots', 'Skills', 'Services'];
+        const exposed = axTree.nodes
+          .filter(node => !node.ignored && node.role?.value === 'region')
+          .map(node => node.name?.value)
+          .filter(name => workflowNames.includes(name));
+        assert.deepEqual(exposed, [measured.regionName], label + ' Chrome accessibility tree must expose only the named active workflow region');
+        verifiedAXRegions.add(destination);
+      }
       assert.equal(measured.activeTag, 'H2', label + ' focus stayed on ' + measured.activeTag);
       assert.equal(measured.sameHeading, true, label + ' focused a different heading');
       assert.equal(measured.tabindex, '-1', label + ' heading is not programmatically focusable');
