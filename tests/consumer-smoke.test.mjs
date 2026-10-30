@@ -1725,8 +1725,16 @@ test('Services actions announce the existing unverified eligibility context', ()
   const serviceLine = app.split('\n').find(line => line.includes("byId('servicecards').innerHTML="));
   assert.ok(serviceLine, 'Expected service preview cards');
   assert.match(page, /id="serviceRobotContext"[^>]*role="status"/);
-  assert.match(serviceLine, /disabled aria-disabled="true" aria-describedby="serviceRobotContext" aria-label=/);
-  assert.match(serviceLine, /aria-describedby="serviceRobotContext" aria-label="Add /);
+  assert.match(serviceLine, /disabled aria-disabled="true" aria-describedby="serviceRobotContext servicePreviewNotice" aria-label=/);
+  assert.match(serviceLine, /aria-describedby="serviceRobotContext servicePreviewNotice" aria-label="Add /);
+});
+
+test('Services preview buttons describe no-booking and no-payment restrictions in both cart states', () => {
+  const serviceLine = app.split('\n').find(line => line.includes("byId('servicecards').innerHTML="));
+  assert.ok(serviceLine, 'Expected service preview card renderer');
+  assert.equal((serviceLine.match(/aria-describedby="serviceRobotContext servicePreviewNotice"/g) || []).length, 2,
+    'Both available and already-in-cart service buttons must reference the visible restrictions');
+  assert.match(page, /id="servicePreviewNotice"[^>]*>Demo prices; profile selection does not verify eligibility\.[^<]*No bookings, service requests or payments are available\./);
 });
 
 test('Discover offers a synchronized demo cart review shortcut without real checkout', () => {
