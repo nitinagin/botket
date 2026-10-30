@@ -737,7 +737,7 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
   }
 });
 
-test('empty Checkout, My Robots, Skills, and Services stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+test('empty Checkout, My Robots, Skills, and Services stay inside 320, 390, and 430 phone widths', { timeout: 90000 }, async () => {
   const root = process.cwd();
   const assets = {
     '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
@@ -959,6 +959,7 @@ test('empty Checkout, My Robots, Skills, and Services stay inside 320 and 390 ph
     await until(() => evaluate("document.querySelector('#products [data-add]') !== null && document.querySelector('#count').textContent === '0'"), 'Discover ready with an empty demo cart');
     await openWidth(320, 640);
     await openWidth(390, 844);
+    await openWidth(430, 932);
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {
@@ -976,7 +977,7 @@ test('empty Checkout, My Robots, Skills, and Services stay inside 320 and 390 ph
   }
 });
 
-test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and 430 phone widths', { timeout: 90000 }, async () => {
   const root = process.cwd();
   const assets = {
     '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
@@ -1303,6 +1304,7 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320 and 390 p
 
     await runJourney(320, 640);
     await runJourney(390, 844);
+    await runJourney(430, 932);
   } finally {
     cdp?.socket.close();
     if (chrome && chrome.exitCode === null) {
