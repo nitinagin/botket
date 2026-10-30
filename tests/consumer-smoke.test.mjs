@@ -24,6 +24,20 @@ test('all five navigation buttons point to real sections', () => {
   assert.deepEqual([...sections].sort(), [...expected].sort());
 });
 
+test('all five consumer sections are named screen-reader regions', () => {
+  const sections = [
+    ['store', 'Explore robots'],
+    ['cart', 'Demo checkout'],
+    ['robots', 'My Robots'],
+    ['skills', 'Skills'],
+    ['services', 'Services']
+  ];
+  for (const [id, title] of sections) {
+    assert.match(page, new RegExp('<section id="' + id + '" aria-labelledby="' + id + '-title"'));
+    assert.match(page, new RegExp('<h2 id="' + id + '-title">' + title + '<\\/h2>'));
+  }
+});
+
 test('static HTML element IDs are unique', () => {
   const ids = [...page.matchAll(/<[a-z][^>]*\sid="([^"]+)"/gi)].map(([, id]) => id);
   assert.ok(ids.length > 0);
@@ -2258,7 +2272,7 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   const robotsList = robots.indexOf('id="myrobots"');
   assert.ok(robotsButton > 0 && robotsButton < robotsForm && robotsForm < robotsList,
     'Explore skill previews stays above the registration form and saved-profile list');
-  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.match(robots, /<h2 id="robots-title">My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
   assert.ok(robots.indexOf('id="openDiscoverFromRobots"') < robotsButton,
     'The empty-state route back to Discover stays with the labelled next step');
   assert.equal(robots.match(/id="openDiscoverFromRobots"/g).length, 1);
@@ -2268,7 +2282,7 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   const skillsCard = skills.indexOf('id="skillcards"');
   assert.ok(skillsButton > 0 && skillsButton < skillsCard,
     'Explore service previews stays above the skill preview list');
-  assert.match(skills, /<h2>Skills<\/h2><p class="muted">[^<]*installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted">[^<]*installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
   assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
@@ -2993,7 +3007,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   const robotsList = robots.indexOf('id="myrobots"');
   assert.ok(robotsHandoff > 0 && robotsHandoff < robotsForm && robotsForm < robotsList,
     'Explore skill previews stays above the registration form and saved-profile list');
-  assert.match(robots, /<h2>My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
+  assert.match(robots, /<h2 id="robots-title">My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
   assert.match(robots, /Saved only in this browser\. No serial numbers, warranty, ownership or compatibility verification\./);
 
   const skillsHandoff = skills.indexOf('id="openServicesFromSkills"');
@@ -3001,7 +3015,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   const skillsList = skills.indexOf('id="skillcards"');
   assert.ok(skillsHandoff > 0 && skillsHandoff < skillsSummary && skillsSummary < skillsList,
     'Explore service previews stays above the filled profile summary and skill preview list');
-  assert.match(skills, /<h2>Skills<\/h2><p class="muted">[^<]*Compatibility is not verified, and installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted">[^<]*Compatibility is not verified, and installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
