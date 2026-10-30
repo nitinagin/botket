@@ -377,6 +377,25 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     const servicesOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     assert.equal(servicesOverflow, 0, 'Filled Services overflows horizontally by ' + servicesOverflow + 'px');
 
+    // The disabled "In demo cart" service action must keep the same honest
+    // accessibility disclosure as the available "Add demo service" action.
+    await evaluate("document.querySelector('#servicecards [data-add=\"s1\"]').click()");
+    await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '2'"), 'Service added to the demo cart');
+    await evaluate("document.querySelector('[data-tab=services]').click()");
+    await until(() => evaluate("document.querySelector('#services').hidden === false && document.querySelector('#servicecards [data-add=\"s1\"]').disabled"), 'Already-added service disabled');
+    const serviceCartAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && /service preview.*no booking/i.test(node.name?.value ?? ''));
+    assert.equal(serviceCartAX.length, 2, 'Both service actions remain in the Chrome accessibility tree');
+    assert.equal(serviceCartAX.filter(node => /already in demo cart/i.test(node.name?.value ?? '')).length, 1,
+      'Exactly one service action must announce that it is already in the demo cart');
+    for (const node of serviceCartAX) {
+      assert.match(node.description?.value ?? '', /profile selection does not verify eligibility/i,
+        'Both service action states must disclose unverified eligibility');
+      assert.match(node.description?.value ?? '', /No bookings, service requests or payments are available/i,
+        'Both service action states must disclose that real services and payments are unavailable');
+    }
+
     // Demo robot profiles are local browser data, unlike the ephemeral demo cart.
     // A reload must restore the profile without implying a purchase or device link.
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
