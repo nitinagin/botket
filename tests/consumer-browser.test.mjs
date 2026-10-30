@@ -306,6 +306,18 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assertReachable(savedSkills, 'Filled Skills');
     const skillsOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     assert.equal(skillsOverflow, 0, 'Filled Skills overflows horizontally by ' + skillsOverflow + 'px');
+    // Verify the disabled install previews expose the selected local profile context
+    // and the unverified compatibility warning in Chrome's accessibility tree.
+    const skillAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && /^Install unavailable for .* \(preview only; compatibility not verified\)$/.test(node.name?.value ?? ''));
+    assert.equal(skillAX.length, 2, 'Both disabled skill previews must appear in the Chrome accessibility tree');
+    for (const node of skillAX) {
+      assert.match(node.description?.value ?? '', /Viewing generic skill previews for local demo profile: Browser Test Robot/,
+        'Skill preview must describe the selected local demo robot profile');
+      assert.match(node.description?.value ?? '', /Compatibility has not been checked; installation is unavailable/i,
+        'Skill preview must disclose that compatibility and installation are unavailable');
+    }
     await evaluate("document.querySelector('#openServicesFromSkills').click()");
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
