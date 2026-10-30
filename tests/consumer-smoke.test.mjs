@@ -1954,6 +1954,13 @@ test('demo profile fields opt out of browser autofill to reduce unintended perso
   }
 });
 
+test('My Robots warns against entering sensitive information in local demo profiles', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  assert.match(robots, /Do not enter serial numbers, account credentials, payment details or other personal information\./);
+  assert.match(robots, /id="saveDemoProfile" type="submit" aria-describedby="profileCount profilePrivacyNotice"/);
+});
+
 test('My Robots save action explains browser-local storage and unverified manufacturer registration', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
