@@ -1948,8 +1948,15 @@ test('Skills disabled install buttons identify each preview without claiming com
 });
 
 
+test('My Robots save action explains browser-local storage and unverified manufacturer registration', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  assert.match(robots, /id="saveDemoProfile" type="submit" aria-describedby="profileCount profilePrivacyNotice"/);
+  assert.match(robots, /<p id="profilePrivacyNotice" class="hint">Saved only in this browser\.[^<]*Clearing this browser's site data removes these local demo profiles; they are not registered with a manufacturer\.<\/p>/);
+});
+
 test('My Robots disables profile submission at 30 saved demos and re-enables it after removal', () => {
-  assert.match(page, /id="saveDemoProfile" type="submit" aria-describedby="profileCount"/);
+  assert.match(page, /id="saveDemoProfile" type="submit" aria-describedby="profileCount profilePrivacyNotice"/);
   assert.match(app, /function renderMyRobots\(\)\{[^\n]*const remaining=30-mine.length;const save=/);
   const source = app.match(/const save=byId\('saveDemoProfile'\);if\(save\)\{[^}]+\}/);
   assert.ok(source, 'Expected save-button limit guard in My Robots renderer');
