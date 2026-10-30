@@ -1940,6 +1940,7 @@ test('Skills disabled install buttons identify each preview without claiming com
   assert.match(actions[0], /disabled aria-disabled="true" aria-label="Install unavailable for Home Patrol \(preview only; compatibility not verified\)"/);
   assert.match(actions[1], /disabled aria-disabled="true" aria-label="Install unavailable for Object Delivery \(preview only; compatibility not verified\)"/);
   for (const action of actions) {
+    assert.match(action, /aria-describedby="skillsRobotSummary"/, 'Unavailable install actions must explain selected demo profile and unverified compatibility');
     assert.match(action, />Install unavailable<\/button>/);
     assert.doesNotMatch(action, /data-install|onclick=/);
   }
