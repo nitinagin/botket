@@ -1295,10 +1295,15 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and
         assert.ok(previewControl.width < 160 && previewControl.height >= 44, '390px Preview order size changed to ' + previewControl.width.toFixed(1) + 'x' + previewControl.height.toFixed(1));
         assert.ok(addService.gap < 0 && addService.reached.gap >= -1, '390px Add demo service must remain reachable below the fold; gap ' + addService.gap.toFixed(1));
         assert.ok(addService.width < 180 && addService.height >= 44, '390px Add demo service size changed to ' + addService.width.toFixed(1) + 'x' + addService.height.toFixed(1));
-      } else {
+      } else if (width === 320) {
         assert.equal(order.previewAfterHint, false, '320px left Preview order after the nickname hint');
         assert.equal(order.buttonAfterDetail, false, '320px left Add demo service after the service detail');
         assert.equal(order.narrowClass, true, '320px did not mark the filled checkout card');
+      } else {
+        assert.equal(width, 430, 'Unexpected phone width');
+        assert.equal(order.previewAfterHint, true, '430px moved Preview order ahead of the nickname hint');
+        assert.equal(order.buttonAfterDetail, true, '430px moved Add demo service ahead of the service detail');
+        assert.equal(order.narrowClass, false, '430px applied the narrow checkout layout');
       }
     };
 
