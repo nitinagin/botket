@@ -332,6 +332,23 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
     assert.equal(await evaluate("document.querySelector('#servicecards [data-add]') !== null"), true);
+    // Check the actual accessible description of the Services profile picker.
+    // The visible demo-only restrictions must reach assistive technology before selection.
+    const { root: serviceDOM } = await send('DOM.getDocument');
+    const { nodeId: serviceSelectId } = await send('DOM.querySelector', {
+      nodeId: serviceDOM.nodeId, selector: '#serviceRobotSelect'
+    });
+    assert.ok(serviceSelectId, 'The Services profile picker must exist');
+    const servicePickerAX = (await send('Accessibility.getPartialAXTree', {
+      nodeId: serviceSelectId, fetchRelatives: false
+    })).nodes[0];
+    assert.ok(servicePickerAX && !servicePickerAX.ignored,
+      'The Services profile picker must appear in the Chrome accessibility tree');
+    assert.match(servicePickerAX.description?.value ?? '', /profile selection does not verify eligibility/i,
+      'Services picker must disclose that selecting a demo profile does not verify eligibility');
+    assert.match(servicePickerAX.description?.value ?? '', /No bookings, service requests or payments are available/i,
+      'Services picker must disclose that booking, service requests and payments are unavailable');
+
     // Check Chrome's computed accessible description, not only the DOM attribute.
     // Both service previews must announce unverified eligibility and no booking.
     const serviceAX = (await send('Accessibility.getFullAXTree')).nodes
