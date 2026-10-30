@@ -260,6 +260,18 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
 
     await evaluate("document.querySelector('#preview').click()");
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No payment or order submission occurred/);
+    // Check the computed accessibility description, not just aria-describedby in HTML.
+    // Both visible checkout actions must disclose that no real transaction occurs.
+    const checkoutAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && /^(Preview order|Continue to My Robots \\(demo\\))/.test(node.name?.value ?? ''));
+    assert.equal(checkoutAX.length, 2, 'Both demo checkout actions must appear in the Chrome accessibility tree');
+    for (const node of checkoutAX) {
+      assert.match(node.description?.value ?? '', /order preview, not a real checkout/i,
+        'Checkout action must announce that this is only a preview');
+      assert.match(node.description?.value ?? '', /No payment, reservation or order submission occurs/i,
+        'Checkout action must announce that no transaction is submitted');
+    }
     await evaluate("document.querySelector('#checkoutToRobots').click()");
     assert.equal(await evaluate("document.querySelector('#robots').hidden"), false);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase/);
