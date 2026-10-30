@@ -1689,6 +1689,14 @@ test('Discover concept actions and Services demo add buttons have distinct acces
   assert.match(page, /No bookings, service requests or payments are available/);
 });
 
+test('Services actions announce the existing unverified eligibility context', () => {
+  const serviceLine = app.split('\n').find(line => line.includes("byId('servicecards').innerHTML="));
+  assert.ok(serviceLine, 'Expected service preview cards');
+  assert.match(page, /id="serviceRobotContext"[^>]*role="status"/);
+  assert.match(serviceLine, /disabled aria-disabled="true" aria-describedby="serviceRobotContext" aria-label=/);
+  assert.match(serviceLine, /aria-describedby="serviceRobotContext" aria-label="Add /);
+});
+
 test('Discover offers a synchronized demo cart review shortcut without real checkout', () => {
   assert.match(page, /id="reviewDiscoverCart" hidden>Review demo cart/);
   assert.match(app, /byId\('reviewDiscoverCart'\)\.onclick=reviewDemoCart/);
