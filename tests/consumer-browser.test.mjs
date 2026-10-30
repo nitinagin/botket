@@ -417,6 +417,9 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
         return {
           beforeTop,
           section: section.id,
+          regionName: document.getElementById(section.getAttribute('aria-labelledby'))?.textContent.trim() ?? null,
+          regionHeadingMatches: document.getElementById(section.getAttribute('aria-labelledby')) === heading,
+          visibleRegions: [...document.querySelectorAll('main section')].filter(node => !node.hidden).map(node => node.id),
           headingTop: rect.top,
           headingBottom: rect.bottom,
           navTop: nav.top,
@@ -436,6 +439,12 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
       assert.notEqual(measured.missing, true, label + ' control missing: ' + selector);
       assert.ok(measured.beforeTop < 0, label + ' must start mid-page, heading top was ' + measured.beforeTop.toFixed(1));
       assert.equal(measured.section, destination, label);
+      assert.deepEqual(measured.visibleRegions, [destination], label + ' must expose only the active workflow region');
+      assert.equal(measured.regionHeadingMatches, true, label + ' region must reference its visible heading');
+      assert.equal(measured.regionName, {
+        store: 'Explore robots', cart: 'Demo checkout', robots: 'My Robots',
+        skills: 'Skills', services: 'Services'
+      }[destination], label + ' region accessible name');
       assert.equal(measured.activeTag, 'H2', label + ' focus stayed on ' + measured.activeTag);
       assert.equal(measured.sameHeading, true, label + ' focused a different heading');
       assert.equal(measured.tabindex, '-1', label + ' heading is not programmatically focusable');
