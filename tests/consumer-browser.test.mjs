@@ -298,6 +298,16 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
     assert.equal(await evaluate("document.querySelector('#servicecards [data-add]') !== null"), true);
+    // Check Chrome's computed accessible description, not only the DOM attribute.
+    // Both service previews must announce unverified eligibility and no booking.
+    const serviceAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && /service preview.*no booking/i.test(node.name?.value ?? ''));
+    assert.equal(serviceAX.length, 2, 'Both service preview actions must appear in the Chrome accessibility tree');
+    for (const node of serviceAX) {
+      assert.match(node.description?.value ?? '', /eligibility and compatibility are unverified/i,
+        'Service preview action must expose its unverified eligibility context to assistive technology');
+    }
     assert.match(await evaluate("document.querySelector('#services > p.muted').textContent"), /No bookings/);
     await evaluate('window.scrollTo(0, 0)');
     const filledServices = '#services #serviceRobotSelect, #services #openSkillsFromServices, #services #openRobotsFromServices, #services #servicecards button';
