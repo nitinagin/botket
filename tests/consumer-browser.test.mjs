@@ -1610,7 +1610,7 @@ test('320px section handoffs start at the heading and keep the next demo action 
   }
 });
 
-test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 390', { timeout: 60000 }, async () => {
+test('keyboard Tab focus stays visible and clear of the bottom nav at 320, 390 and 430', { timeout: 60000 }, async () => {
   const root = process.cwd();
   const assets = {
     '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
@@ -1734,7 +1734,7 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
     ];
 
     let pageOpen = false;
-    for (const [width, height] of [[320, 640], [390, 844]]) {
+    for (const [width, height] of [[320, 640], [390, 844], [430, 932]]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
       if (pageOpen) await evaluate("localStorage.clear()");
       await send('Page.navigate', { url });
@@ -1908,7 +1908,7 @@ test('keyboard Tab focus stays visible and clear of the bottom nav at 320 and 39
   }
 });
 
-test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services jumps instant at 320x640 and 390x844', { timeout: 60000 }, async () => {
+test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services jumps instant at 320x640, 390x844 and 430x932', { timeout: 60000 }, async () => {
   const root = process.cwd();
   const assets = {
     '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
@@ -2180,11 +2180,11 @@ test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services j
 
     const runs = new Map();
     for (const motion of ['reduce', 'no-preference']) {
-      for (const [width, height] of [[320, 640], [390, 844]]) {
+      for (const [width, height] of [[320, 640], [390, 844], [430, 932]]) {
         runs.set(motion + ' ' + width, await runJourney(width, height, motion));
       }
     }
-    for (const width of [320, 390]) {
+    for (const width of [320, 390, 430]) {
       assert.deepEqual(runs.get('reduce ' + width), runs.get('no-preference ' + width), width + 'px reduced motion changed the instant jump behavior');
     }
   } finally {
