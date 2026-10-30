@@ -1618,7 +1618,7 @@ test('duplicate nicknames have distinct profile action labels and a specific rem
 });
 
 test('Services picker changes local demo context without suggesting compatibility or bookings', () => {
-  assert.match(page, /id="serviceRobotSelect"[^>]*aria-describedby="serviceRobotContext"/);
+  assert.match(page, /id="serviceRobotSelect"[^>]*aria-describedby="serviceRobotContext servicePreviewNotice"/);
   const source = app.match(/function updateServicesContext\(\)\{[^\n]*\}/);
   const handler = app.match(/byId\('serviceRobotSelect'\)\.addEventListener\('change',(e=>\{[^\n]*\})\);/);
   assert.ok(source && handler, 'Expected Services selector renderer and change handler');
@@ -1709,7 +1709,16 @@ test('Services warns that demo profile selection does not establish eligibility'
   assert.ok(servicesSection, 'Expected the Services section');
   assert.match(servicesSection, /profile selection does not verify eligibility/);
   assert.match(servicesSection, /No bookings, service requests or payments are available/);
-  assert.match(servicesSection, /id="serviceRobotSelect" aria-describedby="serviceRobotContext"/);
+  assert.match(servicesSection, /id="serviceRobotSelect" aria-describedby="serviceRobotContext servicePreviewNotice"/);
+});
+
+test('Services profile picker announces the visible demo restrictions', () => {
+  const servicesSection = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(servicesSection, 'Expected Services section');
+  assert.match(servicesSection, /<p class="muted" id="servicePreviewNotice">Demo prices; profile selection does not verify eligibility\.[^<]*No bookings, service requests or payments are available\.<\/p>/);
+  assert.match(servicesSection, /<select id="serviceRobotSelect" aria-describedby="serviceRobotContext servicePreviewNotice"><\/select>/);
+  assert.ok(servicesSection.indexOf('id="servicePreviewNotice"') < servicesSection.indexOf('id="serviceRobotSelect"'),
+    'The visible restrictions should appear before the profile picker');
 });
 
 test('Services actions announce the existing unverified eligibility context', () => {
