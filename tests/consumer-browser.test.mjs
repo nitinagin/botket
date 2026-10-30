@@ -264,7 +264,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     // Both visible checkout actions must disclose that no real transaction occurs.
     const checkoutAX = (await send('Accessibility.getFullAXTree')).nodes
       .filter(node => !node.ignored && node.role?.value === 'button'
-        && /^(Preview order|Continue to My Robots \\(demo\\))/.test(node.name?.value ?? ''));
+        && /^(Preview order|Continue to My Robots \(demo\))/.test(node.name?.value ?? ''));
     assert.equal(checkoutAX.length, 2, 'Both demo checkout actions must appear in the Chrome accessibility tree');
     for (const node of checkoutAX) {
       assert.match(node.description?.value ?? '', /order preview, not a real checkout/i,
