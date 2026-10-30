@@ -1705,7 +1705,7 @@ test('Discover concept actions and Services demo add buttons have distinct acces
 });
 
 test('Services warns that demo profile selection does not establish eligibility', () => {
-  const servicesSection = page.match(/<section id="services"[\\s\\S]*?<\\/section>/)?.[0];
+  const servicesSection = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
   assert.ok(servicesSection, 'Expected the Services section');
   assert.match(servicesSection, /Selecting a demo profile does not verify service eligibility/);
   assert.match(servicesSection, /No bookings, service requests or payments are available/);
