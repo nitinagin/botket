@@ -1205,9 +1205,11 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
       await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
       await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#products [data-add]") !== null'), width + ' page ready');
-      await evaluate("localStorage.clear()");
+      // Page.reload may resolve while the old document still matches the ready selector.
+      // Mark the old JS global and wait for a distinct document before interacting.
+      await evaluate("localStorage.clear(); window.__botketTestReloadPending = true");
       await send('Page.reload', { ignoreCache: true });
-      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#products [data-add]") !== null && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), width + ' fresh demo');
+      await until(() => evaluate('window.__botketTestReloadPending !== true && window.innerWidth === ' + width + ' && document.querySelector("#products [data-add]") !== null && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), width + ' fresh demo after reload');
       const at = label => width + 'x' + height + ' ' + label;
       const keep390 = names => width === 390 ? names : null;
 
