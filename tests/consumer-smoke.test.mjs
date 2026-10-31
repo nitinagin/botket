@@ -176,6 +176,16 @@ test('checkout makes temporary demo cart and preview-name storage clear', () => 
   assert.ok(app.includes('let cart=[],mine=[]'), 'Cart must remain in memory, separate from local demo profiles');
 });
 
+test('checkout nickname exposes reload-only storage warning to assistive technology', () => {
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart, 'Expected demo checkout section');
+  const nickname = cart.match(/<input\b[^>]*\bid="name"[^>]*>/)?.[0];
+  assert.ok(nickname, 'Expected checkout nickname input');
+  assert.match(nickname, /aria-describedby="previewNameHint checkoutStorageNotice"/);
+  assert.match(cart, /id="previewNameHint" class="hint"/);
+  assert.match(cart, /id="checkoutStorageNotice" class="hint">Demo cart items and preview names reset when this page reloads/);
+});
+
 test('checkout preview and follow-up buttons expose the no-payment warning to assistive technology', () => {
   const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
   assert.ok(cart, 'Expected the demo checkout section');
