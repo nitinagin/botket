@@ -628,7 +628,7 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.deepEqual(picker.children.map(option => option.value), ['']);
   assert.match(page, /id="openRobotsFromSkills">Manage demo robots →</);
   assert.equal(summary.textContent, 'No demo robot profiles saved. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile. Compatibility has not been checked; installation is unavailable.');
-  assert.match(page, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(page, /id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →/);
   assert.match(page, /id="openRobotsFromSkills">Manage demo robots →/);
   assert.doesNotMatch(summary.textContent, /to get started/);
 });
@@ -2410,7 +2410,7 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   const skillsCard = skills.indexOf('id="skillcards"');
   assert.ok(skillsButton > 0 && skillsButton < skillsCard,
     'Explore service previews stays above the skill preview list');
-  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.[^<]*<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →<\/button><\/p>/);
   assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
@@ -2648,7 +2648,7 @@ test('mobile Skills keeps My Robots and Services actions above the fixed bottom 
   const cards = skills.indexOf('id="skillcards"');
   assert.ok(services > 0 && services < robots && robots < cards,
     'Services and My Robots actions stay above the skill preview list');
-  assert.match(skills, /class="buy next-step" id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /class="buy next-step" id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
   assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
   assert.equal(skills.match(/id="openRobotsFromSkills"/g).length, 1);
@@ -2766,7 +2766,7 @@ test('mobile filled Skills and Services keep profile pickers and preview actions
   const skillCards = skills.indexOf('id="skillcards"');
   assert.ok(skillServices > 0 && skillServices < skillSelect && skillSelect < skillRobots && skillRobots < skillCards,
     'Filled Skills keeps the services handoff, profile select, and robots handoff above the preview list');
-  assert.match(skills, /class="buy next-step" id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /class="buy next-step" id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →/);
   assert.match(skills, /id="skillRobotSelect"/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
   assert.match(skills, /Compatibility is not verified, and installation is unavailable/);
@@ -2919,7 +2919,7 @@ test('narrow empty states keep named demo recovery actions at least 44px and scr
   assert.match(app, /None of these actions verifies ownership, compatibility, or connects a device\./);
   assert.match(app, /browse\.textContent='Explore robot concepts →';browse\.onclick=\(\)=>show\('store'\)/);
   assert.match(skills, /Compatibility is not verified, and installation is unavailable/);
-  assert.match(skills, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(skills, /id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
   assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
   assert.match(services, /No bookings, service requests or payments are available/);
@@ -2982,7 +2982,7 @@ test('narrow phone handoffs align the destination heading to the top of the view
   assert.match(app, /aria-label="Create local demo profile for '\+x\.name\+' \(ownership and compatibility not verified\)"/);
   assert.match(page, /openRobots\.setAttribute\('aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'\)/);
   assert.match(page, /id="openSkillsFromRobots">Explore skill previews →/);
-  assert.match(page, /id="openServicesFromSkills">Explore service previews →/);
+  assert.match(page, /id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →/);
   assert.match(page, /id="openSkillsFromServices">Explore generic skill previews →/);
   assert.match(page, /id="checkoutToRobots" hidden>Continue to My Robots \(demo\) →/);
   assert.doesNotMatch(page, /buy now|place order|payment method|card number|connect your robot|verified compatible/i);
@@ -3143,7 +3143,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   const skillsList = skills.indexOf('id="skillcards"');
   assert.ok(skillsHandoff > 0 && skillsHandoff < skillsSummary && skillsSummary < skillsList,
     'Explore service previews stays above the filled profile summary and skill preview list');
-  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*Compatibility is not verified, and installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*Compatibility is not verified, and installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.[^<]*<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →<\/button><\/p>/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
