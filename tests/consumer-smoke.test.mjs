@@ -98,7 +98,7 @@ test('mobile bottom navigation keeps whole labels, a non-color current section a
 test('Skills to Services handoff announces preview-only limits to assistive technology', () => {
   const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
   assert.ok(skills, 'Expected Skills section');
-  const services = page.match(/<section id="services"[\\s\\S]*?<\\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
   assert.ok(services, 'Expected Services section');
   assert.match(services, /id="servicePreviewNotice"[^>]*>[^<]*No bookings, service requests or payments are available/);
   assert.match(skills, /id="openServicesFromSkills" aria-describedby="skillsPreviewNotice servicePreviewNotice">Explore service previews →<\/button>/);
