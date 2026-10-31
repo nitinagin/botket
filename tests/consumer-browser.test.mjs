@@ -204,6 +204,22 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await until(() => evaluate("document.querySelectorAll('#products [data-add]').length === 3 && document.querySelector('#robotSearch').value === ''"), 'Discover filters restored');
     await evaluate('window.scrollTo(0, 0)');
 
+    // Existing robot owners can reach My Robots directly, without a demo checkout.
+    assertReachable(await bringAboveNav('#openRobotsFromDiscover'), 'Discover direct My Robots route');
+    const ownedRouteAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && node.name?.value === 'Create local demo profile →');
+    assert.equal(ownedRouteAX.length, 1, 'Discover direct route must be accessible');
+    assert.match(ownedRouteAX[0].description?.value ?? '', /No ownership or compatibility verification/i);
+    assert.match(ownedRouteAX[0].description?.value ?? '', /no device connection/i);
+    await evaluate("document.querySelector('#openRobotsFromDiscover').click()");
+    await until(() => evaluate("document.querySelector('#robots').hidden === false"), 'Existing owner My Robots opened');
+    assert.equal(await evaluate("document.querySelector('#cart').hidden"), true, 'Direct route skips checkout');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Direct route adds no demo cart items');
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /0 of 30 demo profiles/);
+    await evaluate("document.querySelector('[data-tab=store]').click()");
+    await until(() => evaluate("document.querySelector('#store').hidden === false"), 'Discover restored after direct route');
+
     await evaluate("document.querySelector('[data-tab=cart]').click()");
     await until(() => evaluate("document.querySelector('#cart').hidden === false"), 'Empty checkout opened');
     assertAboveNav(await measureControls('#items [data-cart-browse], #items [data-cart-robots], #clearCart'), 'Empty checkout');
