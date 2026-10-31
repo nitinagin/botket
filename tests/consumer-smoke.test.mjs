@@ -1996,6 +1996,17 @@ test('My Robots warns at the first profile field before entering sensitive data'
   assert.match(robots, /<p id="profilePrivacyNotice"[^>]*>[^<]*Do not enter serial numbers, account credentials, payment details or other personal information\./);
 });
 
+test('My Robots privacy warning is associated with every demo profile field', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  for (const id of ['robotNickname', 'robotBrand', 'robotModel']) {
+    const field = robots.match(new RegExp('<input id="' + id + '"[^>]*>'))?.[0];
+    assert.ok(field, 'Expected demo profile field ' + id);
+    assert.match(field, /aria-describedby="profilePrivacyNotice"/);
+  }
+  assert.match(robots, /id="profilePrivacyNotice"[^>]*>[^<]*Do not enter serial numbers/);
+});
+
 test('My Robots save action explains browser-local storage and unverified manufacturer registration', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
