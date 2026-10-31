@@ -288,6 +288,12 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       assert.match(node.description?.value ?? '', /No payment, reservation or order submission occurs/i,
         'Checkout action must announce that no transaction is submitted');
     }
+    // Announce that the demo cart never registers an owned robot profile.
+    const profileHandoffAX = checkoutAX.find(node => (node.name?.value ?? '').startsWith('Continue to My Robots'));
+    assert.match(profileHandoffAX.description?.value ?? '', /no profile is created automatically or from cart items/i,
+      'Checkout handoff must not imply demo cart items register a robot');
+    assert.match(profileHandoffAX.description?.value ?? '', /No purchase, booking or ownership verification occurs/i,
+      'Checkout handoff must not imply verified ownership or a transaction');
     await evaluate("document.querySelector('#checkoutToRobots').click()");
     assert.equal(await evaluate("document.querySelector('#robots').hidden"), false);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /does not confirm purchase/);
