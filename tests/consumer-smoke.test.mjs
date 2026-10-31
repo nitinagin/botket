@@ -2700,7 +2700,7 @@ test('mobile one-item Checkout keeps Clear all fully above the fixed bottom nav'
 test('mobile filled My Robots keeps profile actions, handoffs, and the profile form at least 44px', () => {
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   assert.match(mobile, /At 390px filled My Robots nickname, brand, model, and profile search were 37px tall, and Save, Discard, Clear search, Clear all, the Services handoff, Remove, and Review demo cart were 39px/);
-  assert.match(mobile, /#robots #robotNickname,\s*#robots #robotBrand,\s*#robots #robotModel,\s*#robots #saveDemoProfile,\s*#robots #clearRobotDraft,\s*#robots #profileSearch,\s*#robots #clearProfileSearch,\s*#robots #clearProfiles,\s*#robots #myrobots button:not\(\.next-step\),\s*#robots #reviewRobotsCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(mobile, /#robots #robotNickname,\s*#robots #robotBrand,\s*#robots #robotModel,\s*#robots #saveDemoProfile,\s*#robots #continueSavedProfileToSkills,\s*#robots #clearRobotDraft,\s*#robots #profileSearch,\s*#robots #clearProfileSearch,\s*#robots #clearProfiles,\s*#robots #myrobots button:not\(\.next-step\),\s*#robots #reviewRobotsCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
 
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
