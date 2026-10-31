@@ -2381,7 +2381,7 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   const skillsCard = skills.indexOf('id="skillcards"');
   assert.ok(skillsButton > 0 && skillsButton < skillsCard,
     'Explore service previews stays above the skill preview list');
-  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted">[^<]*installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
   assert.equal(skills.match(/id="openServicesFromSkills"/g).length, 1);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
@@ -3114,7 +3114,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   const skillsList = skills.indexOf('id="skillcards"');
   assert.ok(skillsHandoff > 0 && skillsHandoff < skillsSummary && skillsSummary < skillsList,
     'Explore service previews stays above the filled profile summary and skill preview list');
-  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted">[^<]*Compatibility is not verified, and installation is unavailable\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
+  assert.match(skills, /<h2 id="skills-title">Skills<\/h2><p class="muted" id="skillsPreviewNotice">[^<]*Compatibility is not verified, and installation is unavailable\.[^<]*Selecting a demo profile does not verify compatibility\.<\/p><p><button type="button" class="buy next-step" id="openServicesFromSkills">Explore service previews →<\/button><\/p>/);
   assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →/);
 
   assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
