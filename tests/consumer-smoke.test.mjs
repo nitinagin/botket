@@ -180,6 +180,15 @@ test('checkout preview and follow-up buttons expose the no-payment warning to as
   }
 });
 
+test('checkout explains that the demo cart never creates or transfers a robot profile', () => {
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart, 'Expected demo checkout section');
+  assert.match(cart, /After preview, My Robots opens a separate demo form/);
+  assert.match(cart, /no profile is created automatically or from cart items/);
+  assert.match(cart, /Services need no robot profile/);
+  assert.match(cart, /No purchase, booking or ownership verification occurs/);
+});
+
 test('demo cart guards and section handoffs remain present', () => {
   assert.match(app, /cart\.some\(item=>item\.id===x\.id\)/);
   assert.match(app, /cart\.length>=20/);
@@ -2677,7 +2686,7 @@ test('mobile filled Checkout keeps preview, remove, and Discover actions at leas
   const browse = cart.indexOf('id="browseFromCheckout"');
   const preview = cart.indexOf('id="preview"');
   const handoff = cart.indexOf('id="checkoutToRobots"');
-  const disclaimer = cart.indexOf('No purchase, service booking or ownership verification occurs.');
+  const disclaimer = cart.indexOf('No purchase, booking or ownership verification occurs.');
   assert.ok(notice > 0 && notice < items && items < browse && browse < preview && preview < handoff && handoff < disclaimer,
     'Filled checkout keeps the no-payment notice, remove row, Discover return, preview, and My Robots handoff in reach order');
   assert.match(cart, /id="browseFromCheckout"[^>]*>Continue browsing robot concepts →/);
