@@ -180,6 +180,15 @@ test('checkout preview and follow-up buttons expose the no-payment warning to as
   }
 });
 
+test('checkout explains that the demo cart never creates or transfers a robot profile', () => {
+  const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cart, 'Expected demo checkout section');
+  assert.match(cart, /After preview, My Robots opens a separate demo form/);
+  assert.match(cart, /no profile is created automatically or from cart items/);
+  assert.match(cart, /Services need no robot profile/);
+  assert.match(cart, /No purchase, booking or ownership verification occurs/);
+});
+
 test('demo cart guards and section handoffs remain present', () => {
   assert.match(app, /cart\.some\(item=>item\.id===x\.id\)/);
   assert.match(app, /cart\.length>=20/);
