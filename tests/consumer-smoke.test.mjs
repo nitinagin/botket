@@ -169,7 +169,7 @@ test('checkout makes temporary demo cart and preview-name storage clear', () => 
   const start = page.indexOf('<section id="cart"');
   assert.ok(start >= 0, 'Expected demo checkout section');
   const cart = page.slice(start, page.indexOf('</section>', start));
-  const notice = cart.split('id="checkoutDemoNotice" class="muted">')[1]?.split('</p>')[0];
+  const notice = cart.split('id="checkoutStorageNotice" class="hint">')[1]?.split('</p>')[0];
   assert.ok(notice, 'Expected visible checkout disclaimer');
   assert.match(notice, /Demo cart items and preview names reset when this page reloads/);
   assert.match(notice, /saved My Robots profiles are separate/);
