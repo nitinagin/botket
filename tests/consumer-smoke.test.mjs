@@ -227,6 +227,7 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
       name: { value: scenario.name },
       result: { textContent: '' },
       checkoutToRobots: { hidden: true, textContent: '' },
+      checkoutProfileNotice: { textContent: '' },
       robotMessage: { textContent: '' },
       serviceRobotContext: { textContent: '' }
     };
@@ -247,6 +248,15 @@ test('demo checkout preview and handoff handle robot, service, mixed and empty c
       assert.doesNotMatch(elements.result.textContent, /Items:/, 'Empty cart should not show itemized preview');
     }
     assert.equal(elements.checkoutToRobots.hidden, !scenario.items.length, scenario.label);
+    if (scenario.items.length && scenario.destination === 'services') {
+      assert.match(elements.checkoutProfileNotice.textContent, /Service-only preview: return to generic service previews/);
+      assert.match(elements.checkoutProfileNotice.textContent, /No service was booked or paid for/);
+      assert.match(elements.checkoutProfileNotice.textContent, /eligibility and compatibility remain unverified/);
+      assert.doesNotMatch(elements.checkoutProfileNotice.textContent, /My Robots opens a separate demo form/);
+    } else if (scenario.items.length) {
+      assert.match(elements.checkoutProfileNotice.textContent, /My Robots opens a separate demo form/);
+      assert.match(elements.checkoutProfileNotice.textContent, /no profile is created automatically/);
+    }
     if (scenario.destination) {
       new Script('(' + handoff[1] + ')').runInNewContext(context)();
       assert.equal(destination, scenario.destination, scenario.label);
