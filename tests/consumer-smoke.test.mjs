@@ -2315,6 +2315,7 @@ test('empty checkout says no order was placed and opens My Robots without a cart
 
   context.lastBrowseTab = 'services';
   render();
+  assert.equal(elements.items.children[0].textContent, 'Your cart is empty. No service was booked or paid for. Browse service previews; a robot profile is not required.');
   assert.equal(elements.items.children[1].textContent, 'Browse service previews →');
   assert.equal(robotsButton().textContent, 'Open My Robots (demo profiles) →');
   elements.items.children[1].onclick();
@@ -2931,7 +2932,7 @@ test('narrow empty states keep named demo recovery actions at least 44px and scr
   const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
   assert.ok(cart && robots && skills && services, 'Expected Checkout, My Robots, Skills, and Services');
   assert.match(cart, /This is an order preview, not a real checkout\. No payment, reservation or order submission occurs\./);
-  assert.match(app, /empty\.textContent='Your cart is empty\. No order was placed\. Press Open My Robots \(demo profiles\)\. This does not connect a device\.'/);
+  assert.match(app, /empty\.textContent=lastBrowseTab==='services'\?'Your cart is empty\. No service was booked or paid for\. Browse service previews; a robot profile is not required\.':'Your cart is empty\. No order was placed\. Press Open My Robots \(demo profiles\)\. This does not connect a device\.'/);
   assert.match(app, /browse\.textContent=lastBrowseTab==='services'\?'Browse service previews →':'Browse demo robots →'/);
   assert.match(app, /openRobots\.textContent='Open My Robots \(demo profiles\) →'/);
   assert.match(app, /openRobots\.setAttribute\('aria-label','Open My Robots \(demo profiles\) →\. No order is placed and no device is connected\.'\)/);
@@ -2955,6 +2956,7 @@ test('narrow empty states keep named demo recovery actions at least 44px and scr
   const emptyCopy = [
     cart, robots, skills, services,
     "Your cart is empty. No order was placed. Press Open My Robots (demo profiles). This does not connect a device.",
+    'Your cart is empty. No service was booked or paid for. Browse service previews; a robot profile is not required.',
     'Browse demo robots →',
     'Open My Robots (demo profiles) →. No order is placed and no device is connected.',
     'No demo robots added yet.',
