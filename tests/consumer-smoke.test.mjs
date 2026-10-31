@@ -175,9 +175,13 @@ test('checkout preview and follow-up buttons expose the no-payment warning to as
   for (const id of ['preview', 'checkoutToRobots']) {
     const button = cart.match(new RegExp('<button\\b[^>]*\\bid="' + id + '"[^>]*>'))?.[0];
     assert.ok(button, 'Missing checkout action: ' + id);
-    assert.match(button, /aria-describedby="checkoutDemoNotice"/,
-      id + ' must reference the existing visible demo disclaimer');
+    assert.match(button, id === 'checkoutToRobots'
+      ? /aria-describedby="checkoutDemoNotice checkoutProfileNotice"/
+      : /aria-describedby="checkoutDemoNotice"/,
+      id + ' must reference the visible checkout demo disclaimer');
   }
+  assert.match(cart, /<p class="hint" id="checkoutProfileNotice">After preview, My Robots opens a separate demo form/,
+    'Checkout handoff notice must remain visible and associated with its button');
 });
 
 test('checkout explains that the demo cart never creates or transfers a robot profile', () => {
