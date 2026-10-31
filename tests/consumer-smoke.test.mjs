@@ -165,6 +165,16 @@ test('checkout and skills clearly remain demos', () => {
   assert.match(page, /Leave blank to preview as Guest/);
 });
 
+test('checkout makes temporary demo cart and preview-name storage clear', () => {
+  const cart = page.match(/<section id="cart"[\\s\\S]*?<\\/section>/)?.[0];
+  assert.ok(cart, 'Expected demo checkout section');
+  const notice = cart.match(/<p id="checkoutDemoNotice" class="muted">([^<]+)<\\/p>/)?.[1];
+  assert.ok(notice, 'Expected visible checkout disclaimer');
+  assert.match(notice, /Demo cart items and preview names reset when this page reloads/);
+  assert.match(notice, /saved My Robots profiles are separate/);
+  assert.match(app, /let cart=\\[\\],mine=\\[\\]/, 'Cart must remain in memory, separate from local demo profiles');
+});
+
 test('checkout preview and follow-up buttons expose the no-payment warning to assistive technology', () => {
   const cart = page.match(/<section id="cart"[\s\S]*?<\/section>/)?.[0];
   assert.ok(cart, 'Expected the demo checkout section');
