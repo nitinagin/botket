@@ -572,6 +572,42 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^0 of 30/, 'Confirm removes the profile');
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Demo profile removed from this browser/);
 
+    // With multiple saved profiles, Skills and Services must share the exact
+    // selected demo profile, not silently switch to the newest or another model.
+    // This is only a preview selection: it must never change the demo cart.
+    await evaluate("document.querySelector('#robotNickname').value='Kitchen Bot'; document.querySelector('#robotBrand').value='Example Maker'; document.querySelector('#robotModel').value='K1'; document.querySelector('#registerRobot').requestSubmit()");
+    await evaluate("document.querySelector('#robotNickname').value='Garden Bot'; document.querySelector('#robotBrand').value='Example Maker'; document.querySelector('#robotModel').value='G2'; document.querySelector('#registerRobot').requestSubmit()");
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^2 of 30/);
+    const cartBeforeProfileSwitch = await evaluate("document.querySelector('#count').textContent");
+    await evaluate("document.querySelector('[data-tab=skills]').click()");
+    await evaluate("(() => { const picker=document.querySelector('#skillRobotSelect'); const option=[...picker.options].find(x=>x.textContent.includes('Kitchen Bot')); if(!option) throw Error('Kitchen profile missing'); picker.value=option.value; picker.dispatchEvent(new Event('change',{bubbles:true})); })()");
+    const kitchenId = await evaluate("document.querySelector('#skillRobotSelect').value");
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Kitchen Bot — Example Maker · K1/);
+    await evaluate("document.querySelector('#openServicesFromSkills').click()");
+    assert.equal(await evaluate("document.querySelector('#serviceRobotSelect').value"), kitchenId,
+      'Skills to Services must preserve the exact selected profile among multiple profiles');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /Kitchen Bot — Example Maker · K1/);
+    await evaluate("(() => { const picker=document.querySelector('#serviceRobotSelect'); const option=[...picker.options].find(x=>x.textContent.includes('Garden Bot')); if(!option) throw Error('Garden profile missing'); picker.value=option.value; picker.dispatchEvent(new Event('change',{bubbles:true})); })()");
+    const gardenId = await evaluate("document.querySelector('#serviceRobotSelect').value");
+    assert.notEqual(gardenId, kitchenId, 'Different demo profiles must have distinct IDs');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /Garden Bot — Example Maker · G2/);
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
+    await evaluate("document.querySelector('#openSkillsFromServices').click()");
+    assert.equal(await evaluate("document.querySelector('#skillRobotSelect').value"), gardenId,
+      'Services to Skills must preserve the newly selected profile');
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Garden Bot — Example Maker · G2/);
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /Compatibility has not been checked; installation is unavailable/);
+    await evaluate("document.querySelector('[data-tab=robots]').click()");
+    assert.equal(await evaluate("document.querySelectorAll('#myrobots .status').length"), 2);
+    assert.equal(await evaluate("[...document.querySelectorAll('#myrobots article')].filter(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic')).length"), 1,
+      'Only one demo profile may show the selected badge');
+    assert.match(await evaluate("[...document.querySelectorAll('#myrobots article')].find(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic'))?.textContent"), /Garden Bot/);
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
+      'Switching demo profiles must not add any items to the demo cart');
+    await evaluate("window.confirm=()=>true; document.querySelector('#clearProfiles').click()");
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^0 of 30/,
+      'Clean up both temporary demo profiles before the remaining journey');
+
     // A canceled cart clear must not change the cart; confirming clears only demo state.
     await evaluate("document.querySelector('[data-tab=store]').click(); document.querySelector('#products [data-add]').click()");
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '1');
