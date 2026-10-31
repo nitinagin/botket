@@ -3473,13 +3473,13 @@ test('local demo profile count does not incorrectly promise session-only storage
 });
 
 test('My Robots can clear a selected preview context without deleting saved demo profiles', () => {
-  const robots = page.match(/<section id="robots"[\\s\\S]*?<\\/section>/)?.[0];
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
-  assert.match(robots, /id="clearSelectedDemoProfile" aria-describedby="profilePrivacyNotice" hidden>Clear preview selection \\(keep saved profiles\\)<\\/button>/);
-  assert.match(app, /const clearSelection=byId\\('clearSelectedDemoProfile'\\);if\\(clearSelection\\)clearSelection\\.hidden=!mine\\.some\\(x=>x\\.id===selectedRobotId\\)/);
-  const handler = app.match(/byId\\('clearSelectedDemoProfile'\\)\\.onclick=\\(\\)=>\\{[^\\n]+/ )?.[0];
+  assert.match(robots, /id="clearSelectedDemoProfile" aria-describedby="profilePrivacyNotice" hidden>Clear preview selection \(keep saved profiles\)<\/button>/);
+  assert.match(app, /const clearSelection=byId\('clearSelectedDemoProfile'\);if\(clearSelection\)clearSelection\.hidden=!mine\.some\(x=>x\.id===selectedRobotId\)/);
+  const handler = app.match(/byId\('clearSelectedDemoProfile'\)\.onclick=\(\)=>\{[^\n]+/)?.[0];
   assert.ok(handler, 'Expected clear preview selection action');
-  assert.match(handler, /selectedRobotId=null;renderMyRobots\\(\\);updateSkillsRobotSummary\\(\\);updateServicesContext\\(\\)/);
-  assert.match(handler, /profileSearch'\\)\\.focus\\(\\)/);
-  assert.doesNotMatch(handler, /mine\\s*=|saveRobots\\(|localStorage\\./, 'Clearing selection must not remove or rewrite profiles');
+  assert.match(handler, /selectedRobotId=null;renderMyRobots\(\);updateSkillsRobotSummary\(\);updateServicesContext\(\)/);
+  assert.match(handler, /profileSearch'\)\.focus\(\)/);
+  assert.doesNotMatch(handler, /mine\s*=|saveRobots\(|localStorage\./, 'Clearing selection must not remove or rewrite profiles');
 });
