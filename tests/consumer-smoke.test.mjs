@@ -102,6 +102,7 @@ test('Discover gives existing robot owners a direct, demo-only route to My Robot
   assert.match(store, /id="openRobotsFromDiscover"[^>]*aria-describedby="discoverOwnedRobotNotice"/);
   assert.match(store, /Create local demo profile →<\/button>/);
   assert.match(app, /byId\('openRobotsFromDiscover'\)\.onclick=\(\)=>show\('robots'\);/);
+  assert.match(page, /#store #openRobotsFromDiscover \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;/);
 });
 
 test('Discover results expose list semantics only for matching robot concepts', () => {
