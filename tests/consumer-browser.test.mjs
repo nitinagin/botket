@@ -512,7 +512,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '0',
       'Clearing the service-only cart must remove its preview item');
     assert.match(await evaluate("document.querySelector('#items').textContent"),
-      /Your cart is empty\\. No service was booked or paid for\\. Browse service previews; a robot profile is not required\\./,
+      /Your cart is empty\. No service was booked or paid for\. Browse service previews; a robot profile is not required\./,
       'Empty service-origin checkout must not imply a booking or required robot profile');
     assert.equal(await evaluate("document.querySelector('#items [data-cart-browse]').textContent"),
       'Browse service previews →', 'Empty service checkout must offer the Services recovery action');
