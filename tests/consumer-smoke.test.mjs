@@ -2686,7 +2686,7 @@ test('mobile filled Checkout keeps preview, remove, and Discover actions at leas
   const browse = cart.indexOf('id="browseFromCheckout"');
   const preview = cart.indexOf('id="preview"');
   const handoff = cart.indexOf('id="checkoutToRobots"');
-  const disclaimer = cart.indexOf('No purchase, service booking or ownership verification occurs.');
+  const disclaimer = cart.indexOf('No purchase, booking or ownership verification occurs.');
   assert.ok(notice > 0 && notice < items && items < browse && browse < preview && preview < handoff && handoff < disclaimer,
     'Filled checkout keeps the no-payment notice, remove row, Discover return, preview, and My Robots handoff in reach order');
   assert.match(cart, /id="browseFromCheckout"[^>]*>Continue browsing robot concepts →/);
