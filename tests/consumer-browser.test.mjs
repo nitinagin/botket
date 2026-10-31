@@ -374,6 +374,18 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       assert.match(node.description?.value ?? '', /Compatibility has not been checked; installation is unavailable/i,
         'Skill preview must disclose that compatibility and installation are unavailable');
     }
+    // Verify the actual Chrome accessibility description before leaving Skills.
+    // The handoff must announce both Skills and Services demo-only limitations.
+    const skillsToServicesAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && node.name?.value === 'Explore service previews →');
+    assert.equal(skillsToServicesAX.length, 1, 'Skills to Services shortcut must be accessible');
+    assert.match(skillsToServicesAX[0].description?.value ?? '', /Compatibility is not verified, and installation is unavailable/i,
+      'Skills to Services shortcut must disclose unverified compatibility');
+    assert.match(skillsToServicesAX[0].description?.value ?? '', /profile selection does not verify eligibility/i,
+      'Skills to Services shortcut must disclose unverified service eligibility');
+    assert.match(skillsToServicesAX[0].description?.value ?? '', /No bookings, service requests or payments are available/i,
+      'Skills to Services shortcut must disclose unavailable bookings and payments');
     await evaluate("document.querySelector('#openServicesFromSkills').click()");
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
