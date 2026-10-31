@@ -658,6 +658,7 @@ test('skills picker reflects selected demo profiles and keeps compatibility warn
   assert.doesNotMatch(summary.textContent, /Study helper — Example · B/, 'Do not display another profile with the same nickname');
   assert.match(summary.textContent, /Compatibility has not been checked/);
   assert.match(summary.textContent, /installation is unavailable/i);
+  assert.match(summary.textContent, /This selection also applies to generic Services previews; no booking or eligibility verification occurs/);
 
   const focusCallsBeforeBlur = focusCalls;
   context.selectedRobotId = 'deleted-profile';
@@ -1567,6 +1568,7 @@ test('Services shows selected demo profile without implying verified service com
   assert.match(notice.textContent, /not matched to this robot/i);
   assert.match(notice.textContent, /compatibility are unverified/i);
   assert.match(notice.textContent, /no booking is available/i);
+  assert.match(notice.textContent, /This selection also applies to generic Skills previews; no installation is available/);
 
   context.selectedRobotId = 'deleted-profile';
   update();
