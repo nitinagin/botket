@@ -537,6 +537,15 @@ test('removing one demo profile preserves remaining profiles, selection and keyb
   assert.match(elements.robotMessage.textContent, /removed from this browser/i);
 });
 
+test('Skills profile picker explains that selecting a demo profile is not a compatibility check', () => {
+  const section = page.match(/<section id="skills"[\\s\\S]*?<\\/section>/)?.[0];
+  assert.ok(section, 'Expected Skills section');
+  assert.match(section, /id="skillsPreviewNotice"[^>]*>[^<]*Selecting a demo profile does not verify compatibility\\./);
+  assert.match(section, /<select id="skillRobotSelect" aria-describedby="skillsRobotSummary skillsPreviewNotice"><\\/select>/);
+  assert.ok(section.indexOf('id="skillsPreviewNotice"') < section.indexOf('id="skillRobotSelect"'),
+    'Visible preview restrictions should precede the profile selector');
+});
+
 test('skills picker reflects selected demo profiles and keeps compatibility warnings visible', () => {
   const source = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/);
   assert.ok(source, 'Expected the demo skills selector renderer');
