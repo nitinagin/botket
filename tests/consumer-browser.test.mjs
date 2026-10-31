@@ -506,6 +506,26 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^1 of 30/,
       'Service-only preview must not create a robot profile');
 
+    // Clearing a service-only cart must preserve the Services recovery path,
+    // disclose that no booking happened, and leave saved profiles untouched.
+    await evaluate("document.querySelector('[data-tab=cart]').click(); document.querySelector('#clearCart').click()");
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0',
+      'Clearing the service-only cart must remove its preview item');
+    assert.match(await evaluate("document.querySelector('#items').textContent"),
+      /Your cart is empty\\. No service was booked or paid for\\. Browse service previews; a robot profile is not required\\./,
+      'Empty service-origin checkout must not imply a booking or required robot profile');
+    assert.equal(await evaluate("document.querySelector('#items [data-cart-browse]').textContent"),
+      'Browse service previews →', 'Empty service checkout must offer the Services recovery action');
+    assert.equal(await evaluate("document.querySelector('#checkoutToRobots').hidden"), true,
+      'Empty checkout must not retain a previous preview handoff');
+    await evaluate("document.querySelector('#items [data-cart-browse]').click()");
+    assert.equal(await evaluate("document.querySelector('#services').hidden"), false,
+      'Empty service checkout recovery must return to Services');
+    assert.equal(await evaluate("document.querySelector('#robots').hidden"), true,
+      'Empty service checkout recovery must not force My Robots');
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^1 of 30/,
+      'Empty checkout recovery must preserve existing local demo profiles');
+
     // Demo robot profiles are local browser data, unlike the ephemeral demo cart.
     // A reload must restore the profile without implying a purchase or device link.
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
