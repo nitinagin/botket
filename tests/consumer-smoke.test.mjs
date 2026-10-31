@@ -1615,11 +1615,18 @@ test('My Robots opens generic Services with the chosen demo profile, without com
     child.textContent === 'Explore generic service previews (demo) →');
   assert.ok(servicesButton, 'Each profile should offer a direct generic Services route');
   assert.match(servicesButton.attributes['aria-label'], /compatibility not verified/i);
+  assert.match(servicesButton.attributes['aria-label'], /service eligibility not verified/i);
+  assert.match(servicesButton.attributes['aria-label'], /no booking available/i);
   assert.equal(newest.children.at(-1).textContent, 'Remove profile',
     'Existing removal control stays available');
   servicesButton.onclick();
   assert.equal(context.selectedRobotId, 'demo-2', 'Choose the clicked profile, not another with the same nickname');
   assert.deepEqual(visits, ['services']);
+  renderProfiles();
+  const selectedBadge = elements.myrobots.children[0].children.find(child => child.className === 'status');
+  assert.ok(selectedBadge, 'Selected demo profile has a visible status');
+  assert.match(selectedBadge.textContent, /Selected for generic Skills and Services previews/);
+  assert.match(selectedBadge.textContent, /Eligibility and compatibility unverified/);
   elements.serviceRobotContext = { textContent: '' };
   updateContext();
   assert.match(elements.serviceRobotContext.textContent, /Sample Maker · B-2/);
