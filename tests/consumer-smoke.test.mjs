@@ -2500,6 +2500,37 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   assert.match(app, /preview\.className='next-step'/);
 });
 
+test('empty My Robots links directly to generic service previews without a profile', () => {
+  const source = app.match(/function renderMyRobots\(\)\{[^\n]*\}/)?.[0];
+  assert.ok(source, 'Expected My Robots renderer');
+  const node = () => ({
+    children: [], attributes: {}, className: '', hidden: false, disabled: false, textContent: '',
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this.attributes[key] = value; }
+  });
+  const elements = Object.fromEntries(
+    ['myrobots', 'saveDemoProfile', 'profileCount', 'clearProfiles', 'profileSearch',
+      'clearProfileSearch', 'profileSearchSummary', 'openDiscoverFromRobots',
+      'continueSavedProfileToSkills'].map(id => [id, node()])
+  );
+  elements.profileSearch.value = '';
+  const visits = [];
+  const context = {
+    mine: [], selectedRobotId: null,
+    byId: id => elements[id],
+    document: { createElement: node },
+    show: tab => visits.push(tab)
+  };
+  new Script('(' + source + ')').runInNewContext(context)();
+  const serviceShortcut = elements.myrobots.children[3];
+  assert.equal(serviceShortcut.textContent, 'Explore service previews (no profile needed) →');
+  assert.equal(serviceShortcut.type, 'button');
+  assert.match(serviceShortcut.attributes['aria-label'], /No booking, payment or eligibility verification/);
+  serviceShortcut.onclick();
+  assert.deepEqual(visits, ['services']);
+});
+
 test('mobile Discover keeps the first concept card actions above the fixed bottom nav', () => {
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   assert.match(mobile, /At 390px the first concept card sat under the fixed bottom nav/);
