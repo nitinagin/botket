@@ -306,6 +306,36 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /1 of 30/);
     assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Compatibility not verified; no device connected/);
     assert.equal(await evaluate("document.querySelector('#robotMessage').getAttribute('role')"), 'status');
+    // The post-save shortcut must preserve the selected local demo profile without
+    // triggering checkout, a real installation, or a hardware connection.
+    assert.equal(await evaluate("document.querySelector('#continueSavedProfileToSkills').hidden"), false,
+      'Saved profile reveals the direct Skills shortcut');
+    assertReachable(await bringAboveNav('#continueSavedProfileToSkills'), 'Post-save Skills shortcut');
+    const savedShortcutAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && node.name?.value === 'Continue to Skills with selected demo profile →');
+    assert.equal(savedShortcutAX.length, 1, 'Post-save Skills shortcut must be accessible');
+    assert.match(savedShortcutAX[0].description?.value ?? '', /Saved only in this browser/i,
+      'Post-save shortcut must disclose local-only profile storage');
+    const cartBeforeSkillsShortcut = await evaluate("document.querySelector('#count').textContent");
+    await evaluate("document.querySelector('#continueSavedProfileToSkills').click()");
+    assert.equal(await evaluate("document.querySelector('#skills').hidden"), false,
+      'Post-save shortcut opens Skills directly');
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"),
+      /Viewing generic skill previews for local demo profile: Browser Test Robot/,
+      'The saved profile stays selected in Skills');
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"),
+      /Compatibility has not been checked; installation is unavailable/,
+      'The selected profile must not imply verified compatibility');
+    assert.equal(await evaluate("document.querySelector('#skillRobotSelect').value !== ''"), true,
+      'Skills picker retains the saved demo profile');
+    assert.equal(await evaluate("document.querySelector('#cart').hidden"), true,
+      'Post-save shortcut bypasses demo checkout');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeSkillsShortcut,
+      'Post-save shortcut must not alter the demo cart');
+    await evaluate("document.querySelector('#openRobotsFromSkills').click()");
+    assert.equal(await evaluate("document.querySelector('#robots').hidden"), false,
+      'Return to My Robots preserves the existing journey');
     const filledRobots = '#robots #openSkillsFromRobots, #robots #robotNickname, #robots #robotBrand, #robots #robotModel, #robots #saveDemoProfile, #robots #profileSearch, #robots #clearProfiles, #robots #myrobots button, #robots #reviewRobotsCart';
     const savedRobots = await bringAboveNav(filledRobots);
     assert.equal(savedRobots.length, 11, 'Filled My Robots shows the skills handoff, profile form, search, clear, profile actions, and cart review');
