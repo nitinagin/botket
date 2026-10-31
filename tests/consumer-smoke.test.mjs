@@ -95,6 +95,16 @@ test('mobile bottom navigation keeps whole labels, a non-color current section a
   assert.doesNotMatch(mobile, /transition:|animation:/);
 });
 
+test('Discover gives existing robot owners a direct, demo-only route to My Robots', () => {
+  const store = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(store, 'Expected the Discover section');
+  assert.match(store, /id="discoverOwnedRobotNotice"[^>]*>[^<]*No ownership or compatibility verification/);
+  assert.match(store, /id="openRobotsFromDiscover"[^>]*aria-describedby="discoverOwnedRobotNotice"/);
+  assert.match(store, /Create local demo profile →<\/button>/);
+  assert.match(app, /byId\('openRobotsFromDiscover'\)\.onclick=\(\)=>show\('robots'\);/);
+  assert.match(page, /#store #openRobotsFromDiscover \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;/);
+});
+
 test('Discover results expose list semantics only for matching robot concepts', () => {
   assert.match(page, /id="products" aria-label="Robot concept search results"/);
   const renderSource = app.match(/function render\(\)\{[^\n]*/)?.[0];
@@ -2455,7 +2465,7 @@ test('mobile Discover keeps the first concept card actions above the fixed botto
 test('mobile Discover keeps search, category filters, and recovery actions at least 44px', () => {
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   assert.match(mobile, /At 390px Discover category chips were 39px tall, concept search was 37px tall, and Clear search, Show all, and Review demo cart were 39px/);
-  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart,\s*#store #openRobotsFromDiscover \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > h2 \{ margin: 4px 0 2px; \}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > p\.muted \{ margin-bottom: 2px; \}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) \.store-filters \{ margin-bottom: 2px; \}/);
