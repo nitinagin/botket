@@ -95,6 +95,16 @@ test('mobile bottom navigation keeps whole labels, a non-color current section a
   assert.doesNotMatch(mobile, /transition:|animation:/);
 });
 
+test('saved demo profile offers a contextual, accessible Skills handoff without new integrations', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots');
+  assert.match(robots, /id="continueSavedProfileToSkills" aria-describedby="profilePrivacyNotice" hidden>Continue to Skills with selected demo profile →<\/button>/);
+  assert.match(app, /byId\('continueSavedProfileToSkills'\)\.onclick=\(\)=>show\('skills'\);/);
+  assert.match(app, /continueSkills\.hidden=!mine\.some\(x=>x\.id===selectedRobotId\)/);
+  assert.match(page, /#robots #continueSavedProfileToSkills,/);
+  assert.doesNotMatch(robots, /payment method|install now|verified compatible/i);
+});
+
 test('Discover gives existing robot owners a direct, demo-only route to My Robots', () => {
   const store = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
   assert.ok(store, 'Expected the Discover section');
@@ -2430,7 +2440,7 @@ test('My Robots and Skills show a labelled demo next step before the long mobile
   assert.equal(browse.type, 'button');
   browse.onclick();
   assert.deepEqual(visits, ['store']);
-  assert.match(app, /Press Browse generic skills \(demo\) on this saved profile\. Compatibility not verified; no device connected\./);
+  assert.match(app, /Use Continue to Skills with selected demo profile below, or Browse generic skills on the saved card\. Compatibility not verified; no device connected\./);
   assert.match(app, /preview\.className='next-step'/);
 });
 
@@ -3159,7 +3169,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   const elements = Object.fromEntries(
     ['myrobots', 'saveDemoProfile', 'profileCount', 'clearProfiles', 'profileSearch',
       'clearProfileSearch', 'profileSearchSummary', 'openDiscoverFromRobots', 'openSkillsFromRobots',
-      'skillRobotSelect', 'skillsRobotSummary'].map(id => [id, node()])
+      'continueSavedProfileToSkills', 'skillRobotSelect', 'skillsRobotSummary'].map(id => [id, node()])
   );
   elements.profileSearch.value = '';
   const profile = { id: 'demo-1', name: 'Home helper', brand: 'Example Robotics', model: 'Model A' };
@@ -3174,6 +3184,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   new Script('(' + source[0] + ')').runInNewContext(context)();
   assert.equal(elements.openDiscoverFromRobots.hidden, true, 'A saved profile hides only the empty Discover route');
   assert.equal(elements.openSkillsFromRobots.hidden, false, 'Filled My Robots must keep Explore skill previews');
+  assert.equal(elements.continueSavedProfileToSkills.hidden, false, 'Selected saved profile exposes the immediate Skills handoff');
   assert.equal(elements.myrobots.children.length, 1);
   const card = elements.myrobots.children[0];
   assert.equal(card.children[4].textContent, 'Browse generic skills (demo) →');
@@ -3181,6 +3192,10 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   assert.match(card.children[4].attributes['aria-label'], /compatibility not verified/);
   card.children[4].onclick();
   assert.deepEqual(visits, ['skills']);
+  context.selectedRobotId = null;
+  new Script('(' + source[0] + ')').runInNewContext(context)();
+  assert.equal(elements.continueSavedProfileToSkills.hidden, true, 'No selected profile hides the contextual Skills handoff');
+  context.selectedRobotId = profile.id;
 
   new Script('(' + summarySource[0] + ')').runInNewContext(context)();
   assert.match(elements.skillsRobotSummary.textContent, /Viewing generic skill previews for local demo profile: Home helper — Example Robotics · Model A\./);
