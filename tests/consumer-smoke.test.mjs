@@ -2465,7 +2465,7 @@ test('mobile Discover keeps the first concept card actions above the fixed botto
 test('mobile Discover keeps search, category filters, and recovery actions at least 44px', () => {
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   assert.match(mobile, /At 390px Discover category chips were 39px tall, concept search was 37px tall, and Clear search, Show all, and Review demo cart were 39px/);
-  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart,\s*#store #openRobotsFromDiscover \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > h2 \{ margin: 4px 0 2px; \}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) > p\.muted \{ margin-bottom: 2px; \}/);
   assert.match(mobile, /#store:has\(#clearRobotSearch:not\(\[hidden\]\)\) \.store-filters \{ margin-bottom: 2px; \}/);
