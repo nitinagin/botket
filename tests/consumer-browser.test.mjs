@@ -217,6 +217,29 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.querySelector('#cart').hidden"), true, 'Direct route skips checkout');
     assert.equal(await evaluate("document.querySelector('#count').textContent"), '0', 'Direct route adds no demo cart items');
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /0 of 30 demo profiles/);
+
+    // The empty My Robots service shortcut must be reachable on mobile and
+    // remain a generic preview: no profile, cart item, or booking is created.
+    const emptyRobotActions = await bringAboveNav('#myrobots button');
+    assert.equal(emptyRobotActions.length, 2, 'Empty My Robots shows Discover and Services shortcuts');
+    assertReachable(emptyRobotActions, 'Empty My Robots shortcuts');
+    const emptyServiceAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && /Explore generic service previews without a robot profile/.test(node.name?.value ?? ''));
+    assert.equal(emptyServiceAX.length, 1, 'Empty My Robots service shortcut is accessible');
+    assert.match(emptyServiceAX[0].name.value, /No booking, payment or eligibility verification/i);
+    await evaluate("document.querySelector('#myrobots button:last-child').click()");
+    assert.equal(await evaluate("document.querySelector('#services').hidden"), false,
+      'Empty My Robots shortcut opens generic Services');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"),
+      /generic service previews, not matched to any robot/i);
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"),
+      /eligibility and compatibility are unverified/i);
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^0 of 30/,
+      'Service previews must not create a demo profile');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0',
+      'Service previews must not add a cart item');
+
     await evaluate("document.querySelector('[data-tab=store]').click()");
     await until(() => evaluate("document.querySelector('#store').hidden === false"), 'Discover restored after direct route');
 
