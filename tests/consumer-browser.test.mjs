@@ -386,8 +386,18 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       'Skills to Services shortcut must disclose unverified service eligibility');
     assert.match(skillsToServicesAX[0].description?.value ?? '', /No bookings, service requests or payments are available/i,
       'Skills to Services shortcut must disclose unavailable bookings and payments');
+    // A Skills → Services handoff preserves the selected demo profile without touching checkout.
+    const selectedSkillProfile = await evaluate("document.querySelector('#skillRobotSelect').value");
+    const cartBeforeServiceHandoff = await evaluate("document.querySelector('#count').textContent");
+    assert.ok(selectedSkillProfile, 'A saved demo profile must be selected before the handoff');
     await evaluate("document.querySelector('#openServicesFromSkills').click()");
     assert.equal(await evaluate("document.querySelector('#services').hidden"), false);
+    assert.equal(await evaluate("document.querySelector('#serviceRobotSelect').value"), selectedSkillProfile,
+      'Skills to Services must retain the selected local demo profile');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /Selected local demo profile: Browser Test Robot/,
+      'Services must disclose which demo profile is selected');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeServiceHandoff,
+      'Navigating from Skills to Services must not add anything to the demo cart');
     assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /eligibility and compatibility are unverified/i);
     assert.equal(await evaluate("document.querySelector('#servicecards [data-add]') !== null"), true);
     // Check the actual accessible description of the Services profile picker.
