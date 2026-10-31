@@ -3138,7 +3138,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   assert.ok(robotsHandoff > 0 && robotsHandoff < robotsForm && robotsForm < robotsList,
     'Explore skill previews stays above the registration form and saved-profile list');
   assert.match(robots, /<h2 id="robots-title">My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
-  assert.match(robots, /Saved only in this browser\. No serial numbers, warranty, ownership or compatibility verification\./);
+  assert.match(robots, /Saved only in this browser when storage is available\. Profiles may remain after you close this tab\. No serial numbers, warranty, ownership or compatibility verification\./);
 
   const skillsHandoff = skills.indexOf('id="openServicesFromSkills"');
   const skillsSummary = skills.indexOf('id="skillsRobotSummary"');
