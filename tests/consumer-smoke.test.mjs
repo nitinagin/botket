@@ -2051,7 +2051,7 @@ test('My Robots save action explains browser-local storage and unverified manufa
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots section');
   assert.match(robots, /id="saveDemoProfile" type="submit" aria-describedby="profileCount profilePrivacyNotice"/);
-  assert.match(robots, /<p id="profilePrivacyNotice" class="hint">Saved only in this browser\.[^<]*Clearing this browser's site data removes these local demo profiles; they are not registered with a manufacturer\.<\/p>/);
+  assert.match(robots, /<p id="profilePrivacyNotice" class="hint">Saved only in this browser when storage is available\. Profiles may remain after you close this tab\.[^<]*Clearing this browser's site data removes these local demo profiles; they are not registered with a manufacturer\.<\/p>/);
 });
 
 test('My Robots disables profile submission at 30 saved demos and re-enables it after removal', () => {
@@ -3138,7 +3138,7 @@ test('narrow filled My Robots and Skills keep the next demo handoff ahead of the
   assert.ok(robotsHandoff > 0 && robotsHandoff < robotsForm && robotsForm < robotsList,
     'Explore skill previews stays above the registration form and saved-profile list');
   assert.match(robots, /<h2 id="robots-title">My Robots<\/h2><p class="muted">[^<]*does not verify ownership or connect hardware\.<\/p><p><button type="button" class="next-step" id="openDiscoverFromRobots">Explore robot concepts →<\/button> <button type="button" class="buy next-step" id="openSkillsFromRobots">Explore skill previews →<\/button><\/p>/);
-  assert.match(robots, /Saved only in this browser\. No serial numbers, warranty, ownership or compatibility verification\./);
+  assert.match(robots, /Saved only in this browser when storage is available\. Profiles may remain after you close this tab\. No serial numbers, warranty, ownership or compatibility verification\./);
 
   const skillsHandoff = skills.indexOf('id="openServicesFromSkills"');
   const skillsSummary = skills.indexOf('id="skillsRobotSummary"');
@@ -3378,4 +3378,10 @@ test('mobile consumer header logo and non-text indicators meet WCAG 2.2 AA contr
     ['#087d3c', '#fffdf5', 'service note accent on the page']
   ];
   for (const [foreground, background, label] of indicators) assertContrast(foreground, background, 3, label);
+});
+
+test('local demo profile count does not incorrectly promise session-only storage', () => {
+  assert.match(app, /mine\.length\+' of 30 demo profiles available here\. '/);
+  assert.doesNotMatch(app, /mine\.length\+' of 30 demo profiles in this session\. '/);
+  assert.match(page, /Profiles may remain after you close this tab\./);
 });
