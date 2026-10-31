@@ -95,6 +95,15 @@ test('mobile bottom navigation keeps whole labels, a non-color current section a
   assert.doesNotMatch(mobile, /transition:|animation:/);
 });
 
+test('Discover gives existing robot owners a direct, demo-only route to My Robots', () => {
+  const store = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(store, 'Expected the Discover section');
+  assert.match(store, /id="discoverOwnedRobotNotice"[^>]*>[^<]*No ownership or compatibility verification/);
+  assert.match(store, /id="openRobotsFromDiscover"[^>]*aria-describedby="discoverOwnedRobotNotice"/);
+  assert.match(store, /Create local demo profile →<\/button>/);
+  assert.match(app, /byId\('openRobotsFromDiscover'\)\.onclick=\(\)=>show\('robots'\);/);
+});
+
 test('Discover results expose list semantics only for matching robot concepts', () => {
   assert.match(page, /id="products" aria-label="Robot concept search results"/);
   const renderSource = app.match(/function render\(\)\{[^\n]*/)?.[0];
