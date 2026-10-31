@@ -95,6 +95,15 @@ test('mobile bottom navigation keeps whole labels, a non-color current section a
   assert.doesNotMatch(mobile, /transition:|animation:/);
 });
 
+test('Skills to Services handoff announces preview-only limits to assistive technology', () => {
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(skills, 'Expected Skills section');
+  assert.match(skills, /id="skillsPreviewNotice"[^>]*>[^<]*selected demo profiles carry over as context only; no eligibility checks or bookings/);
+  assert.match(skills, /id="openServicesFromSkills" aria-describedby="skillsPreviewNotice">Explore service previews →<\/button>/);
+  assert.match(app, /byId\('openServicesFromSkills'\)\.onclick=\(\)=>show\('services'\);/);
+  assert.match(app, /function updateServicesContext\(\)\{const selected=mine\.find\(x=>x\.id===selectedRobotId\)/);
+});
+
 test('saved demo profile offers a contextual, accessible Skills handoff without new integrations', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots');
