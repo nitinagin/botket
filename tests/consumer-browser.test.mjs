@@ -470,6 +470,42 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
         'Both service action states must disclose that real services and payments are unavailable');
     }
 
+    // A service-only checkout must return to Services, not My Robots, and must
+    // disclose that the preview neither books nor pays for a real service.
+    await evaluate("window.confirm = () => true; document.querySelector('[data-tab=cart]').click(); document.querySelector('#clearCart').click()");
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '0',
+      'Clearing the mixed demo cart prepares an independent service-only preview');
+    await evaluate("document.querySelector('[data-tab=services]').click()");
+    await evaluate("document.querySelector('#servicecards [data-add=\"s2\"]').click()");
+    await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '1'"),
+      'Service-only demo cart opened');
+    await evaluate("document.querySelector('#preview').click()");
+    assert.match(await evaluate("document.querySelector('#result').textContent"),
+      /0 robot concept\(s\), 1 service preview\(s\)/,
+      'Service-only preview must not include a robot purchase');
+    assert.equal(await evaluate("document.querySelector('#checkoutToRobots').textContent"),
+      'Return to service previews →', 'Service-only handoff must point to Services');
+    assert.match(await evaluate("document.querySelector('#checkoutProfileNotice').textContent"),
+      /No service was booked or paid for; no robot profile is needed/i);
+    const serviceOnlyHandoffAX = (await send('Accessibility.getFullAXTree')).nodes
+      .filter(node => !node.ignored && node.role?.value === 'button'
+        && node.name?.value === 'Return to service previews →');
+    assert.equal(serviceOnlyHandoffAX.length, 1, 'Service-only handoff must be accessible');
+    assert.match(serviceOnlyHandoffAX[0].description?.value ?? '', /order preview, not a real checkout/i);
+    assert.match(serviceOnlyHandoffAX[0].description?.value ?? '', /No service was booked or paid for/i);
+    assert.match(serviceOnlyHandoffAX[0].description?.value ?? '', /Service eligibility and compatibility remain unverified/i);
+    await evaluate("document.querySelector('#checkoutToRobots').click()");
+    assert.equal(await evaluate("document.querySelector('#services').hidden"), false,
+      'Service-only checkout must return to Services');
+    assert.equal(await evaluate("document.querySelector('#robots').hidden"), true,
+      'Service-only checkout must not open My Robots');
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"),
+      /Service-only demo checkout preview: no service was booked and no payment was taken/i);
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '1',
+      'Returning to Services must not change the demo cart');
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^1 of 30/,
+      'Service-only preview must not create a robot profile');
+
     // Demo robot profiles are local browser data, unlike the ephemeral demo cart.
     // A reload must restore the profile without implying a purchase or device link.
     await send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/consumer.html' });
