@@ -15,7 +15,7 @@ test('Robot City has one self-contained, parseable application script', () => {
 test('Phase 1 uses a single named canvas arena and visible status', () => {
   assert.match(html, /<canvas id="game" width="960" height="600" aria-label="[^"]+"/);
   assert.match(html, /id="status" role="status"/);
-  for (const id of ['score', 'deliveries', 'mode', 'status', 'game', 'left', 'forward', 'right', 'auto', 'reset']) {
+  for (const id of ['score', 'deliveries', 'mode', 'status', 'game', 'left', 'forward', 'back', 'right', 'auto', 'reset']) {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(([, id]) => id);
@@ -27,6 +27,9 @@ test('keyboard and pointer controls support desktop and tablet', () => {
   assert.match(app, /ArrowDown:'back'/);
   assert.match(app, /KeyW:'forward'/);
   assert.match(app, /KeyA:'left'/);
+  assert.match(app, /bind\('back','back'\)/);
+  assert.match(html, /id="back" aria-label="Reverse"/);
+  assert.match(html, /Tablet: hold Drive, Reverse, or Turn controls\./);
   assert.match(app, /pointerdown/);
   assert.match(app, /pointerup/);
   assert.match(app, /pointercancel/);
