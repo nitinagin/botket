@@ -65,3 +65,38 @@ test('animation uses bounded delta time', () => {
   assert.match(app, /Math\.min\(\.04,\(t-last\)\/1000\|\|0\)/);
   assert.match(app, /requestAnimationFrame\(frame\)/);
 });
+
+test('scripted AI toggle announces its state and reset restores manual mode', () => {
+  assert.match(html, /id="auto" aria-pressed="false" aria-label="Toggle scripted AI driving"/);
+  assert.match(html, /Basic scripted navigation/);
+  const elements = new Map();
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      const attrs = new Map();
+      elements.set(id, {
+        handlers, attrs, textContent: '',
+        addEventListener(type, handler) { handlers.set(type, handler); },
+        setAttribute(name, value) { attrs.set(name, value); },
+        getContext() { return {}; },
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener() {} },
+    requestAnimationFrame() {},
+  });
+  const toggle = getElementById('auto');
+  assert.equal(toggle.attrs.get('aria-pressed'), 'false');
+  assert.equal(toggle.textContent, 'Scripted AI: Off');
+  toggle.handlers.get('click')();
+  assert.equal(toggle.attrs.get('aria-pressed'), 'true');
+  assert.equal(toggle.textContent, 'Scripted AI: On');
+  assert.equal(getElementById('mode').textContent, 'Mode: Scripted AI');
+  getElementById('reset').handlers.get('click')();
+  assert.equal(toggle.attrs.get('aria-pressed'), 'false');
+  assert.equal(toggle.textContent, 'Scripted AI: Off');
+  assert.equal(getElementById('mode').textContent, 'Mode: Manual');
+});
