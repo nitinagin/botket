@@ -150,6 +150,26 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
     assert.ok(await evaluate('window.__robotPose.y') < desktopStart - 15, 'Desktop ArrowUp must move robot');
     assert.deepEqual(await evaluate('window.__robotErrors'), []);
+
+    // Browser-level gameplay acceptance: the scripted route must complete a
+    // real pickup and delivery, not merely toggle the mode label.
+    await evaluate('document.getElementById("reset").click(); document.getElementById("auto").click()');
+    const autoDelivery = await waitFor(async () => {
+      const state = await evaluate(`({
+        deliveries: document.getElementById('deliveries').textContent,
+        score: document.getElementById('score').textContent,
+        mode: document.getElementById('mode').textContent,
+        errors: window.__robotErrors
+      })`);
+      return state.deliveries === 'Deliveries: 1' ? state : null;
+    }, 'scripted AI delivery in real Chrome', 25000);
+    assert.equal(autoDelivery.score, 'Score: 110', 'One scripted delivery must award 110 points');
+    assert.equal(autoDelivery.mode, 'Mode: Scripted AI');
+    assert.deepEqual(autoDelivery.errors, [], 'Scripted delivery must not throw browser errors');
+    await evaluate('document.getElementById("reset").click()');
+    assert.equal(await evaluate('document.getElementById("score").textContent'), 'Score: 0');
+    assert.equal(await evaluate('document.getElementById("deliveries").textContent'), 'Deliveries: 0');
+    assert.equal(await evaluate('document.getElementById("mode").textContent'), 'Mode: Manual');
   } finally {
     if (chrome && chrome.exitCode === null && chrome.signalCode === null) {
       const exited = new Promise(resolve => chrome.once('exit', resolve));
