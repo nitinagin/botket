@@ -663,6 +663,19 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       'Clearing the filter restores the selected profile badge');
     assert.match(await evaluate("[...document.querySelectorAll('#myrobots article')].find(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic'))?.textContent"), /Garden Bot/);
     assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeFilter);
+    // A no-match search must expose only the existing clear-search action,
+    // not a second duplicate button inside the empty-results grid.
+    await evaluate("document.querySelector('#profileSearch').value='zzzz-no-match'; document.querySelector('#profileSearch').dispatchEvent(new Event('input',{bubbles:true}))");
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing 0 of 2 matching demo profile/);
+    assert.equal(await evaluate("document.querySelectorAll('#robots #clearProfileSearch:not([hidden])').length"), 1,
+      'No-match recovery must show one visible Clear search action');
+    assert.equal(await evaluate("document.querySelectorAll('#myrobots button').length"), 0,
+      'Empty profile results must not render a duplicate clear-search button');
+    await evaluate("document.querySelector('#clearProfileSearch').click()");
+    assert.equal(await evaluate("document.activeElement.id"), 'profileSearch');
+    assert.equal(await evaluate("document.querySelector('#profileSearch').value"), '');
+    assert.equal(await evaluate("document.querySelectorAll('#myrobots article').length"), 2);
+    assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeFilter);
     assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch);
     // Clearing the preview context must not delete either saved demo profile,
     // change the demo cart, or leave Skills/Services pointing at the old robot.
