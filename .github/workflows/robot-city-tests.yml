@@ -1,4 +1,4 @@
-name: Robot City Phase 1 smoke tests
+name: Robot City Phase 1 tests
 
 on:
   push:
@@ -6,11 +6,13 @@ on:
     paths:
       - robot-city.html
       - tests/robot-city-smoke.test.mjs
+      - tests/robot-city-browser.test.mjs
       - .github/workflows/robot-city-tests.yml
   pull_request:
     paths:
       - robot-city.html
       - tests/robot-city-smoke.test.mjs
+      - tests/robot-city-browser.test.mjs
       - .github/workflows/robot-city-tests.yml
   workflow_dispatch:
 
@@ -31,3 +33,7 @@ jobs:
           package-manager-cache: false
       - name: Run Robot City smoke tests
         run: node --test tests/robot-city-smoke.test.mjs
+      - name: Verify Chrome is installed
+        run: command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Run Robot City browser controls test
+        run: node --test tests/robot-city-browser.test.mjs
