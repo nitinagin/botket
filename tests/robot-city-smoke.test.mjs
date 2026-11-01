@@ -41,7 +41,7 @@ test('keyboard and pointer controls support desktop and tablet', () => {
 test('pickup, delivery, collision penalty and reset are implemented', () => {
   assert.match(app, /const pickup=\{/);
   assert.match(app, /drop=\{/);
-  assert.match(app, /carrying=true;score\+=10/);
+  assert.match(app, /carrying=true;autoWaypoint=0;score\+=10/);
   assert.match(app, /deliveries\+\+;score\+=100/);
   assert.match(app, /score=Math\.max\(0,score-1\)/);
   assert.match(app, /function reset\(\)\{robot=\{/);
