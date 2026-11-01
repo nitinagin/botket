@@ -100,3 +100,54 @@ test('scripted AI toggle announces its state and reset restores manual mode', ()
   assert.equal(toggle.textContent, 'Scripted AI: Off');
   assert.equal(getElementById('mode').textContent, 'Mode: Manual');
 });
+
+test('manual driving picks up a parcel, handles an obstacle, and resets', () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const ctx = new Proxy({}, { get: () => () => {} });
+  let nextFrame;
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '', handlers,
+        getContext: () => ctx,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute() {},
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener(type, fn) { listeners.set(type, fn); } },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  let time = 0;
+  function frames(count) {
+    for (let i = 0; i < count; i++) {
+      time += 20;
+      const callback = nextFrame;
+      assert.equal(typeof callback, 'function');
+      nextFrame = undefined;
+      callback(time);
+    }
+  }
+  function key(type, code) {
+    listeners.get(type)({ code, preventDefault() {} });
+  }
+  frames(1);
+  key('keydown', 'ArrowUp'); frames(107); key('keyup', 'ArrowUp');
+  key('keydown', 'ArrowRight'); frames(27); key('keyup', 'ArrowRight');
+  key('keydown', 'ArrowUp'); frames(12); key('keyup', 'ArrowUp');
+  assert.equal(getElementById('score').textContent, 'Score: 10');
+  assert.equal(getElementById('status').textContent, 'Deliver to the green zone');
+  key('keydown', 'ArrowUp'); frames(60); key('keyup', 'ArrowUp');
+  const scoreAfterCollision = Number(getElementById('score').textContent.split(': ')[1]);
+  assert.ok(scoreAfterCollision >= 0 && scoreAfterCollision < 10, 'Obstacle must deduct points without making score negative');
+  assert.equal(getElementById('deliveries').textContent, 'Deliveries: 0');
+  getElementById('reset').handlers.get('click')();
+  assert.equal(getElementById('score').textContent, 'Score: 0');
+  assert.equal(getElementById('deliveries').textContent, 'Deliveries: 0');
+  assert.equal(getElementById('status').textContent, 'Pick up the blue package');
+});
