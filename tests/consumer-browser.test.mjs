@@ -623,6 +623,19 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
       'Filtering must not rewrite saved demo profiles');
     assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
       'Filtering must not change the demo cart');
+    assert.equal(await evaluate("document.querySelector('#showSelectedDemoProfile').hidden"), false,
+      'A filtered-out selected profile needs a one-click recovery');
+    await evaluate("document.querySelector('#showSelectedDemoProfile').click()");
+    assert.equal(await evaluate("document.querySelector('#profileSearch').value"), '');
+    assert.equal(await evaluate("document.activeElement.closest('[data-selected-demo]')?.querySelector('h3')?.textContent"), 'Garden Bot',
+      'Revealing the selection should focus the selected profile action');
+    assert.equal(await evaluate("document.querySelector('#showSelectedDemoProfile').hidden"), true,
+      'Recovery control must hide after the selected profile is visible');
+    assert.equal(await evaluate("document.querySelector('#skillRobotSelect').value"), gardenId);
+    assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeFilter);
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch);
+    await evaluate("document.querySelector('#profileSearch').value='Kitchen'; document.querySelector('#profileSearch').dispatchEvent(new Event('input',{bubbles:true}))");
+    assert.equal(await evaluate("document.querySelector('#showSelectedDemoProfile').hidden"), false);
     await evaluate("document.querySelector('#clearProfileSearch').click()");
     assert.equal(await evaluate("document.activeElement.id"), 'profileSearch',
       'Clearing profile search returns focus to its input');
