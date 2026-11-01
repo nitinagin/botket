@@ -320,3 +320,72 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   frames(5);
   assert.equal(robotPosition.y, beforeBlur, 'Leaving the browser window must stop movement');
 });
+
+test('manual pickup can hand off to scripted AI and return to manual safely', () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const ctx = new Proxy({}, { get: () => () => {} });
+  let nextFrame;
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      const attrs = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '', handlers, attrs,
+        getContext: () => ctx,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute(name, value) { attrs.set(name, value); },
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener(type, fn) { listeners.set(type, fn); } },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  let time = 0;
+  function frames(count) {
+    for (let i = 0; i < count; i++) {
+      time += 20;
+      const callback = nextFrame;
+      assert.equal(typeof callback, 'function', 'Animation must keep running');
+      nextFrame = undefined;
+      callback(time);
+    }
+  }
+  function hold(code, count) {
+    listeners.get('keydown')({ code, preventDefault() {} });
+    frames(count);
+    listeners.get('keyup')({ code, preventDefault() {} });
+  }
+  frames(1);
+  // Reach the parcel manually using the existing proven pickup path.
+  hold('ArrowRight', 27);
+  hold('ArrowUp', 13);
+  hold('ArrowLeft', 27);
+  hold('ArrowUp', 115);
+  assert.equal(getElementById('score').textContent, 'Score: 10');
+  assert.equal(getElementById('status').textContent, 'Deliver to the green zone');
+
+  // Switch modes while carrying; the fixed route must still finish delivery.
+  getElementById('auto').handlers.get('click')();
+  assert.equal(getElementById('auto').attrs.get('aria-pressed'), 'true');
+  let completed = false;
+  for (let i = 0; i < 1500; i++) {
+    frames(1);
+    if (getElementById('deliveries').textContent === 'Deliveries: 1') {
+      completed = true;
+      break;
+    }
+  }
+  assert.ok(completed, 'Scripted AI must finish a manually started delivery');
+  assert.equal(getElementById('score').textContent, 'Score: 110');
+
+  getElementById('auto').handlers.get('click')();
+  assert.equal(getElementById('auto').attrs.get('aria-pressed'), 'false');
+  assert.equal(getElementById('mode').textContent, 'Mode: Manual');
+  // Manual mode without held keys must not complete another delivery.
+  frames(50);
+  assert.equal(getElementById('deliveries').textContent, 'Deliveries: 1');
+});
