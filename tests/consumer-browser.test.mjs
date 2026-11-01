@@ -299,6 +299,23 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
 
     await evaluate("document.querySelector('#preview').click()");
     assert.match(await evaluate("document.querySelector('#result').textContent"), /No payment or order submission occurred/);
+    // A real Escape key clears the optional checkout nickname after preview.
+    // Editing a preview invalidates the handoff; clearing the name must not restore it
+    // or alter the demo cart, and users can preview again without submitting an order.
+    await evaluate("document.querySelector('#name').focus(); document.querySelector('#name').value='Temporary nickname'; document.querySelector('#name').dispatchEvent(new Event('input', { bubbles: true }))");
+    assert.equal(await evaluate("document.querySelector('#checkoutToRobots').hidden"), true,
+      'Editing the preview nickname must invalidate the checkout handoff');
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+    assert.equal(await evaluate("document.querySelector('#name').value"), '', 'Escape clears the nickname');
+    assert.equal(await evaluate("document.activeElement.id"), 'name', 'Escape returns focus to nickname');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '1', 'Escape keeps the demo cart intact');
+    assert.equal(await evaluate("document.querySelector('#checkoutToRobots').hidden"), true,
+      'Escape cannot revive an invalidated checkout handoff');
+    assert.match(await evaluate("document.querySelector('#result').textContent"), /no order or personal details are submitted/i);
+    await evaluate("document.querySelector('#preview').click()");
+    assert.equal(await evaluate("document.querySelector('#checkoutToRobots').hidden"), false,
+      'Users can preview again after clearing the nickname');
     // Check the computed accessibility description, not just aria-describedby in HTML.
     // Both visible checkout actions must disclose that no real transaction occurs.
     const checkoutAX = (await send('Accessibility.getFullAXTree')).nodes
