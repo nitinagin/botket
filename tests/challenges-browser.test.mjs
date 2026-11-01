@@ -26,6 +26,66 @@ async function until(fn, message, timeout = 12000) {
   }
   throw new Error('Timed out: ' + message);
 }
+const CHROME_LAUNCH_ATTEMPTS = 3;
+const CHROME_DEVTOOLS_TIMEOUT_MS = 45000;
+function rememberStderr(chrome) {
+  let text = '';
+  chrome.stderr.on('data', chunk => { text = (text + chunk.toString('utf8')).slice(-8000); });
+  return () => text.trim();
+}
+async function stopChrome(chrome) {
+  if (!chrome || chrome.exitCode !== null || chrome.signalCode !== null) return;
+  const exited = new Promise(resolve => chrome.once('exit', resolve));
+  chrome.kill('SIGKILL');
+  await Promise.race([exited, sleep(1000)]);
+}
+async function waitForDevToolsPort(chrome, portFile, timeout, spawnError) {
+  const start = Date.now();
+  let exitError;
+  const onExit = code => { exitError = new Error('Chrome exited before debugging started (code ' + code + ').'); };
+  if (chrome.exitCode !== null) onExit(chrome.exitCode);
+  else chrome.once('exit', onExit);
+  try {
+    while (Date.now() - start < timeout) {
+      if (spawnError.error) throw spawnError.error;
+      if (exitError) throw exitError;
+      if (existsSync(portFile)) {
+        const port = Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+        if (port) return port;
+      }
+      await sleep(100);
+    }
+    throw new Error('Timed out: Chrome DevTools port');
+  } finally {
+    chrome.removeListener('exit', onExit);
+  }
+}
+async function launchChrome(dir) {
+  let lastError = 'Chrome did not open a DevTools port.';
+  for (let attempt = 1; attempt <= CHROME_LAUNCH_ATTEMPTS; attempt++) {
+    const profile = join(dir, 'profile-' + attempt);
+    const spawnError = {};
+    const chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + profile, 'about:blank'
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const stderr = rememberStderr(chrome);
+    chrome.once('error', error => { spawnError.error = error; });
+    try {
+      const port = await waitForDevToolsPort(chrome, join(profile, 'DevToolsActivePort'), CHROME_DEVTOOLS_TIMEOUT_MS, spawnError);
+      return { chrome, port };
+    } catch (error) {
+      const log = stderr();
+      lastError = 'Chrome launch attempt ' + attempt + '/' + CHROME_LAUNCH_ATTEMPTS + ' failed: ' + error.message
+        + (log ? '\nChrome stderr:\n' + log : '\nChrome stderr: (empty)');
+      console.error(lastError);
+      await stopChrome(chrome);
+    }
+  }
+  throw new Error(lastError);
+}
 async function openCDP(url) {
   const socket = new WebSocket(url);
   await new Promise((resolve, reject) => {
@@ -73,19 +133,9 @@ async function withChallengesPage(run) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const dir = mkdtempSync(join(tmpdir(), 'botket-challenges-'));
   const downloads = join(dir, 'downloads');
-  let chrome, cdp;
+  let chrome, cdp, port;
   try {
-    chrome = spawn(browserBinary(), [
-      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
-      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-      '--remote-allow-origins=*', '--remote-debugging-port=0',
-      '--user-data-dir=' + join(dir, 'profile'), 'about:blank'
-    ], { stdio: 'ignore' });
-    const portFile = join(dir, 'profile', 'DevToolsActivePort');
-    const port = await until(() => {
-      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
-      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
-    }, 'Chrome DevTools port', 20000);
+    ({ chrome, port } = await launchChrome(dir));
     const tab = await until(async () => {
       const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
       return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
@@ -136,7 +186,7 @@ const viewports = [
   { label: 'iPad Pro portrait 1024x1366', width: 1024, height: 1366, mobile: true }
 ];
 
-test('challenges page fits phone and iPad viewports without horizontal scrolling', { timeout: 60000 }, async () => {
+test('challenges page fits phone and iPad viewports without horizontal scrolling', { timeout: 180000 }, async () => {
   await withChallengesPage(async ({ evaluate, open }) => {
     for (const viewport of viewports) {
       await open(viewport.width, viewport.height, viewport.mobile);
@@ -160,8 +210,7 @@ test('challenges page fits phone and iPad viewports without horizontal scrolling
       assert.equal(layout.vw, viewport.width, viewport.label + ' viewport applied');
       assert.ok(layout.scrollWidth <= layout.vw, viewport.label + ' scrolls horizontally: ' + layout.scrollWidth + ' > ' + layout.vw);
       assert.deepEqual(layout.outside, [], viewport.label + ' has elements outside the viewport');
-      // Current PR #97 styling renders the button ~39px tall; 44px is tracked by the todo test below.
-      assert.ok(layout.button.height >= 36 && layout.button.width >= 44,
+      assert.ok(layout.button.height >= 44 && layout.button.width >= 44,
         viewport.label + ' download button tap target is ' + layout.button.width.toFixed(1) + 'x' + layout.button.height.toFixed(1));
       assert.ok(layout.minField >= 44, viewport.label + ' smallest planner field is ' + layout.minField.toFixed(1) + 'px tall');
       assert.ok(layout.h1Size >= 32 && layout.h1Size <= 56, viewport.label + ' headline size ' + layout.h1Size);
@@ -171,7 +220,7 @@ test('challenges page fits phone and iPad viewports without horizontal scrolling
   });
 });
 
-test('planner validation blocks empty and whitespace-only drafts without downloading', { timeout: 60000 }, async () => {
+test('planner validation blocks empty and whitespace-only drafts without downloading', { timeout: 180000 }, async () => {
   await withChallengesPage(async ({ evaluate, open, downloads }) => {
     await open(390, 844, true);
     const submit = "document.querySelector('#planner button[type=submit]').click()";
@@ -203,7 +252,7 @@ test('planner validation blocks empty and whitespace-only drafts without downloa
   });
 });
 
-test('valid planner input downloads a local draft-only .txt and sends nothing', { timeout: 60000 }, async () => {
+test('valid planner input downloads a local draft-only .txt and sends nothing', { timeout: 180000 }, async () => {
   await withChallengesPage(async ({ evaluate, open, downloads, requests, origin }) => {
     for (const [width, height] of [[390, 844], [768, 1024]]) {
       rmSync(downloads, { recursive: true, force: true });
@@ -237,8 +286,7 @@ test('valid planner input downloads a local draft-only .txt and sends nothing', 
   });
 });
 
-test('download button meets the 44px minimum tap target on phones and iPads',
-  { timeout: 60000, todo: 'challenges.html button is ~39px tall (padding:12px 20px); add min-height:44px in PR #97' }, async () => {
+test('download button meets the 44px minimum tap target on phones and iPads', { timeout: 180000 }, async () => {
   await withChallengesPage(async ({ evaluate, open }) => {
     for (const viewport of viewports) {
       await open(viewport.width, viewport.height, viewport.mobile);
