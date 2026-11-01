@@ -3504,3 +3504,22 @@ test('saved demo profile messages describe the shared Skills and Services previe
   assert.match(addProfile, /Compatibility not verified; no device connected\./,
     'Saving a profile must retain the unverified and no-connection disclosure');
 });
+
+
+test('filtered My Robots selection has a safe one-click reveal action', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots, 'Expected My Robots section');
+  assert.match(robots, /id="showSelectedDemoProfile" hidden aria-describedby="profileSearchSummary">Show selected demo profile<\/button>/);
+  const render = app.match(/function renderMyRobots\(\)\{[^\n]*/)?.[0];
+  assert.ok(render, 'Expected My Robots renderer');
+  assert.match(render, /const selectedHidden=Boolean\(query&&selectedRobotId&&mine\.some/);
+  assert.match(render, /if\(reveal\)reveal\.hidden=!selectedHidden/);
+  assert.match(render, /if\(selectedRobotId===x\.id\)box\.setAttribute\('data-selected-demo',''\)/);
+  const handler = app.match(/byId\('showSelectedDemoProfile'\)\.onclick=\(\)=>\{[^\n]+/)?.[0];
+  assert.ok(handler, 'Expected reveal action');
+  assert.match(handler, /byId\('profileSearch'\)\.value='';renderMyRobots\(\)/);
+  assert.match(handler, /root\.querySelector\('\[data-selected-demo\]'\)/);
+  assert.match(handler, /\(action\|\|byId\('profileSearch'\)\)\.focus\(\)/);
+  assert.doesNotMatch(handler, /selectedRobotId\s*=|mine\s*=|saveRobots\(|localStorage\./,
+    'Revealing the selected profile must not change saved profiles or selection');
+});
