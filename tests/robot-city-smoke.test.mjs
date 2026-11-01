@@ -151,3 +151,64 @@ test('manual driving picks up a parcel, handles an obstacle, and resets', () => 
   assert.equal(getElementById('deliveries').textContent, 'Deliveries: 0');
   assert.equal(getElementById('status').textContent, 'Pick up the blue package');
 });
+
+test('manual controls complete a full pickup-to-delivery route and award 110 points', () => {
+  const elements = new Map();
+  const listeners = new Map();
+  const canvasContext = new Proxy({}, { get: () => () => {} });
+  let nextFrame;
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '', handlers,
+        getContext: () => canvasContext,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute() {},
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener(type, fn) { listeners.set(type, fn); } },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  let time = 0;
+  function frames(count) {
+    for (let i = 0; i < count; i++) {
+      time += 20;
+      const callback = nextFrame;
+      assert.equal(typeof callback, 'function', 'Animation should continue');
+      nextFrame = undefined;
+      callback(time);
+    }
+  }
+  function hold(code, count) {
+    listeners.get('keydown')({ code, preventDefault() {} });
+    frames(count);
+    listeners.get('keyup')({ code, preventDefault() {} });
+  }
+  frames(1);
+  // Drive east to align with pickup, then north to collect the package.
+  hold('ArrowRight', 27);
+  hold('ArrowUp', 13);
+  hold('ArrowLeft', 27);
+  hold('ArrowUp', 115);
+  assert.equal(getElementById('score').textContent, 'Score: 10');
+  assert.equal(getElementById('status').textContent, 'Deliver to the green zone');
+
+  // Travel south of the buildings, east through the corridor, then south to drop-off.
+  hold('ArrowRight', 54);
+  hold('ArrowUp', 67);
+  hold('ArrowLeft', 27);
+  hold('ArrowUp', 231);
+  hold('ArrowRight', 27);
+  hold('ArrowUp', 54);
+  assert.equal(getElementById('score').textContent, 'Score: 110');
+  assert.equal(getElementById('deliveries').textContent, 'Deliveries: 1');
+  assert.equal(getElementById('status').textContent, 'Pick up the blue package');
+  getElementById('reset').handlers.get('click')();
+  assert.equal(getElementById('score').textContent, 'Score: 0');
+  assert.equal(getElementById('deliveries').textContent, 'Deliveries: 0');
+});
