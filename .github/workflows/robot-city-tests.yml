@@ -1,0 +1,33 @@
+name: Robot City Phase 1 smoke tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - robot-city.html
+      - tests/robot-city-smoke.test.mjs
+      - .github/workflows/robot-city-tests.yml
+  pull_request:
+    paths:
+      - robot-city.html
+      - tests/robot-city-smoke.test.mjs
+      - .github/workflows/robot-city-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  robot-city-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Run Robot City smoke tests
+        run: node --test tests/robot-city-smoke.test.mjs
