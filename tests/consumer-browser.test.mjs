@@ -604,6 +604,36 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("[...document.querySelectorAll('#myrobots article')].find(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic'))?.textContent"), /Garden Bot/);
     assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
       'Switching demo profiles must not add any items to the demo cart');
+    // A search can hide the selected profile without clearing its shared
+    // Skills/Services preview context or changing saved profiles or the cart.
+    const savedProfilesBeforeFilter = await evaluate("localStorage.getItem('botket-demo-robots-v1')");
+    await evaluate("document.querySelector('#profileSearch').value='Kitchen'; document.querySelector('#profileSearch').dispatchEvent(new Event('input',{bubbles:true}))");
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing 1 of 2 matching demo profile/);
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Selected demo profile is hidden by search.*selection still applies to generic Skills and Services previews/);
+    assert.equal(await evaluate("document.querySelector('#clearProfileSearch').hidden"), false,
+      'Filtered profiles must provide a clear-search recovery');
+    assert.match(await evaluate("document.querySelector('#myrobots').textContent"), /Kitchen Bot/);
+    assert.doesNotMatch(await evaluate("document.querySelector('#myrobots').textContent"), /Garden Bot/,
+      'Selected Garden Bot is hidden by the Kitchen filter, not deselected');
+    assert.equal(await evaluate("document.querySelector('#skillRobotSelect').value"), gardenId,
+      'Filtering must not change the Skills preview selection');
+    assert.equal(await evaluate("document.querySelector('#serviceRobotSelect').value"), gardenId,
+      'Filtering must not change the Services preview selection');
+    assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeFilter,
+      'Filtering must not rewrite saved demo profiles');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
+      'Filtering must not change the demo cart');
+    await evaluate("document.querySelector('#clearProfileSearch').click()");
+    assert.equal(await evaluate("document.activeElement.id"), 'profileSearch',
+      'Clearing profile search returns focus to its input');
+    assert.equal(await evaluate("document.querySelector('#profileSearch').value"), '');
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing all 2 demo profile\(s\)/);
+    assert.doesNotMatch(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /hidden by search/);
+    assert.equal(await evaluate("[...document.querySelectorAll('#myrobots article .status')].filter(x=>x.textContent.startsWith('Selected for generic')).length"), 1,
+      'Clearing the filter restores the selected profile badge');
+    assert.match(await evaluate("[...document.querySelectorAll('#myrobots article')].find(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic'))?.textContent"), /Garden Bot/);
+    assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeFilter);
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch);
     // Clearing the preview context must not delete either saved demo profile,
     // change the demo cart, or leave Skills/Services pointing at the old robot.
     const savedProfilesBeforeClear = await evaluate("localStorage.getItem('botket-demo-robots-v1')");
