@@ -604,6 +604,34 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.match(await evaluate("[...document.querySelectorAll('#myrobots article')].find(x=>x.querySelector('.status')?.textContent.startsWith('Selected for generic'))?.textContent"), /Garden Bot/);
     assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
       'Switching demo profiles must not add any items to the demo cart');
+    // Clearing the preview context must not delete either saved demo profile,
+    // change the demo cart, or leave Skills/Services pointing at the old robot.
+    const savedProfilesBeforeClear = await evaluate("localStorage.getItem('botket-demo-robots-v1')");
+    assert.equal(await evaluate("document.querySelector('#clearSelectedDemoProfile').hidden"), false,
+      'A selected demo profile reveals the clear-selection control');
+    assertReachable(await bringAboveNav('#clearSelectedDemoProfile'), 'Clear preview selection');
+    await evaluate("document.querySelector('#clearSelectedDemoProfile').click()");
+    assert.equal(await evaluate("document.activeElement.id"), 'profileSearch',
+      'Clearing the preview context returns keyboard focus to profile search');
+    assert.equal(await evaluate("document.querySelector('#clearSelectedDemoProfile').hidden"), true,
+      'Clear selection is hidden once no profile is selected');
+    assert.equal(await evaluate("document.querySelector('#continueSavedProfileToSkills').hidden"), true,
+      'Selected-profile shortcut is hidden after clearing selection');
+    assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^2 of 30/,
+      'Clearing the selection keeps both demo profiles');
+    assert.equal(await evaluate("localStorage.getItem('botket-demo-robots-v1')"), savedProfilesBeforeClear,
+      'Clearing the selection must not mutate saved demo profiles');
+    assert.equal(await evaluate("document.querySelector('#skillRobotSelect').value"), '',
+      'Skills must return to all generic previews');
+    assert.equal(await evaluate("document.querySelector('#serviceRobotSelect').value"), '',
+      'Services must return to all generic previews');
+    assert.match(await evaluate("document.querySelector('#skillsRobotSummary').textContent"), /2 local demo robot profile\(s\) saved/);
+    assert.match(await evaluate("document.querySelector('#serviceRobotContext').textContent"), /not matched to any robot/);
+    assert.equal(await evaluate("[...document.querySelectorAll('#myrobots article .status')].filter(x=>x.textContent.startsWith('Selected for generic')).length"), 0,
+      'No saved robot should remain marked selected');
+    assert.match(await evaluate("document.querySelector('#robotMessage').textContent"), /Preview selection cleared.*eligibility remain unverified/);
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), cartBeforeProfileSwitch,
+      'Clearing selection must not change the demo cart');
     await evaluate("window.confirm=()=>true; document.querySelector('#clearProfiles').click()");
     assert.match(await evaluate("document.querySelector('#profileCount').textContent"), /^0 of 30/,
       'Clean up both temporary demo profiles before the remaining journey');
