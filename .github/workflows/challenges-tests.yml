@@ -1,0 +1,41 @@
+name: Challenges page tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - challenges.html
+      - academy.html
+      - tests/challenges-smoke.test.mjs
+      - tests/challenges-browser.test.mjs
+      - .github/workflows/challenges-tests.yml
+  pull_request:
+    paths:
+      - challenges.html
+      - academy.html
+      - tests/challenges-smoke.test.mjs
+      - tests/challenges-browser.test.mjs
+      - .github/workflows/challenges-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  challenges:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Run challenges smoke tests
+        run: node --test tests/challenges-smoke.test.mjs
+      - name: Verify Chrome is installed
+        run: command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Test challenges page in headless phone and iPad Chrome
+        run: node --test tests/challenges-browser.test.mjs
