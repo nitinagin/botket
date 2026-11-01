@@ -1264,11 +1264,13 @@ test('My Robots search normalizes whitespace and case without changing saved det
   elements.profileSearch.value = 'not present';
   render();
   assert.match(elements.profileSearchSummary.textContent, /Showing 0 of 2 matching/);
-  assert.equal(root.children.length, 2, 'No matches shows a message and clear-search button');
+  assert.equal(root.children.length, 1, 'No matches shows one message; the existing Clear search control remains available');
+  assert.match(root.children[0].textContent, /use Clear search above to show all saved profiles/);
+  assert.equal(elements.clearProfileSearch.hidden, false, 'No-match state keeps the single search recovery control visible');
   assert.equal(root.attributes.role, 'group', 'Empty search results are not announced as list items');
-  root.children[1].onclick();
+  elements.profileSearch.value = '';
+  render();
   assert.equal(elements.profileSearch.value, '');
-  assert.equal(elements.profileSearch.focused, true, 'Clearing search restores keyboard focus');
   assert.equal(root.children.length, 2);
   assert.match(elements.profileSearchSummary.textContent, /Showing all 2 demo profile/);
   assert.equal(elements.clearProfiles.textContent, 'Clear all 2 demo profiles', 'Unfiltered clear-all label remains concise');
@@ -2840,7 +2842,8 @@ test('mobile filled My Robots keeps profile actions, handoffs, and the profile f
   assert.match(app, /servicesPreview\.setAttribute\('aria-label','Explore generic service previews with '/);
   assert.match(app, /remove\.textContent='Remove profile'/);
   assert.match(app, /remove\.setAttribute\('data-remove',''\)/);
-  assert.match(app, /clearSearch\.textContent='Clear search'/);
+  assert.match(app, /byId\('clearProfileSearch'\)\.onclick=/);
+  assert.doesNotMatch(app, /const clearSearch=document\.createElement\('button'\)/, 'No-match results should not create a duplicate Clear search button');
   assert.match(app, /compatibility not verified/);
   assert.match(app, /byId\('reviewRobotsCart'\)\.hidden=!cart\.length/);
   assert.match(app, /byId\('reviewRobotsCart'\)\.onclick=reviewDemoCart/);
