@@ -1231,6 +1231,16 @@ test('My Robots search normalizes whitespace and case without changing saved det
   assert.equal(root.children[0].attributes.role, 'listitem', 'Each saved profile is a list item');
   assert.equal(mine[0].name, 'Home   Helper', 'Searching must not mutate saved profiles');
 
+  context.selectedRobotId = 'p2';
+  render();
+  assert.match(elements.profileSearchSummary.textContent, /Selected demo profile is hidden by search/, 'Filtering out the selected profile must be explained');
+  assert.match(elements.profileSearchSummary.textContent, /Clear search to see it/, 'The notice must explain how to reveal the selected profile');
+  assert.equal(mine.length, 2, 'Filtering does not remove saved profiles');
+  context.selectedRobotId = 'p1';
+  render();
+  assert.doesNotMatch(elements.profileSearchSummary.textContent, /hidden by search/, 'Visible selection needs no warning');
+  context.selectedRobotId = null;
+
   elements.profileSearch.value = '  sAMpLE    mAkEr ';
   render();
   assert.equal(root.children.length, 1);
