@@ -3483,3 +3483,14 @@ test('My Robots can clear a selected preview context without deleting saved demo
   assert.match(handler, /profileSearch'\)\.focus\(\)/);
   assert.doesNotMatch(handler, /mine\s*=|saveRobots\(|localStorage\./, 'Clearing selection must not remove or rewrite profiles');
 });
+
+test('saved demo profile messages describe the shared Skills and Services preview context', () => {
+  const addProfile = app.split('\n').find(line => line.startsWith('function addDemoRobot('));
+  assert.ok(addProfile, 'Expected local demo profile save handler');
+  assert.match(addProfile, /saved\?'Demo profile saved locally and selected for generic Skills and Services previews\./);
+  assert.match(addProfile, /:'Demo profile added for this session and selected for generic Skills and Services previews\./);
+  assert.doesNotMatch(addProfile, /selected for generic skill previews\./,
+    'Neither storage outcome should imply the selection is Skills-only');
+  assert.match(addProfile, /Compatibility not verified; no device connected\./,
+    'Saving a profile must retain the unverified and no-connection disclosure');
+});
