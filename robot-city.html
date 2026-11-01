@@ -4,23 +4,23 @@
 <header><a href="index.html">← BOTKET</a><h1>Robot City — Delivery Mission</h1><p>Phase 1 playable browser prototype · One robot · One arena · Basic scripted navigation</p></header>
 <main><div class="hud"><strong id="score">Score: 0</strong><strong id="deliveries">Deliveries: 0</strong><strong id="mode">Mode: Manual</strong><strong id="status" role="status">Pick up the blue package</strong></div><canvas id="game" width="960" height="600" aria-label="Top-down robot delivery arena"></canvas>
 <div class="controls"><button id="left" aria-label="Turn left">↶ Left</button><button id="forward" aria-label="Move forward">↑ Drive</button><button id="back" aria-label="Reverse">↓ Reverse</button><button id="right" aria-label="Turn right">Right ↷</button><button id="auto" aria-pressed="false" aria-label="Toggle scripted AI driving">Scripted AI: Off</button><button id="reset">Restart</button></div>
-<p class="hint">Desktop: Arrow keys or WASD. Tablet: hold Drive, Reverse, or Turn controls. Pick up the blue package, then deliver it to the green destination. Auto AI is a simple scripted obstacle-avoidance demonstration, not trained machine learning.</p></main>
+<p class="hint">Desktop: Arrow keys or WASD. Tablet: hold Drive, Reverse, or Turn controls. Pick up the blue package, then deliver it to the green destination. Scripted AI follows fixed waypoints around obstacles in this arena; it is not trained machine learning.</p></main>
 <footer>Local demonstration only. No online scores, prizes, accounts, real robot connection, or marketplace transactions.</footer>
 <script>
 (()=>{'use strict';
 const c=document.getElementById('game'),ctx=c.getContext('2d'),W=c.width,H=c.height;
 const obstacles=[{x:225,y:100,w:80,h:150},{x:450,y:40,w:90,h:190},{x:660,y:160,w:100,h:140},{x:330,y:360,w:100,h:120},{x:590,y:410,w:90,h:100}];
-const pickup={x:135,y:125},drop={x:850,y:495};let robot,score,deliveries,carrying,auto,keys={},last=0,cooldown=0;
+const pickup={x:135,y:125},drop={x:850,y:495};let robot,score,deliveries,carrying,auto,keys={},last=0,cooldown=0,autoWaypoint=0;
 const el=id=>document.getElementById(id);
-function reset(){robot={x:95,y:480,a:-Math.PI/2};score=0;deliveries=0;carrying=false;auto=false;keys={};cooldown=0;update();}
+function reset(){robot={x:95,y:480,a:-Math.PI/2};score=0;deliveries=0;carrying=false;auto=false;keys={};cooldown=0;autoWaypoint=0;update();}
 function update(){el('score').textContent='Score: '+score;el('deliveries').textContent='Deliveries: '+deliveries;el('mode').textContent='Mode: '+(auto?'Scripted AI':'Manual');el('auto').textContent='Scripted AI: '+(auto?'On':'Off');el('auto').setAttribute('aria-pressed',String(auto));el('status').textContent=carrying?'Deliver to the green zone':'Pick up the blue package';}
 function collision(x,y){const r=20;return x<r||x>W-r||y<r||y>H-r||obstacles.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h);}
 function step(dt){cooldown=Math.max(0,cooldown-dt);let turn=0,drive=0;
-if(auto){const goal=carrying?drop:pickup,desired=Math.atan2(goal.y-robot.y,goal.x-robot.x);let diff=Math.atan2(Math.sin(desired-robot.a),Math.cos(desired-robot.a));const look=65,ax=robot.x+Math.cos(robot.a)*look,ay=robot.y+Math.sin(robot.a)*look;if(collision(ax,ay)){turn=1;drive=.38}else{turn=Math.max(-1,Math.min(1,diff*2));drive=Math.abs(diff)<1.15?1:.25;}}
+if(auto){const route=carrying?[{x:135,y:330},{x:850,y:330},drop]:[{x:135,y:440},pickup];let goal=route[Math.min(autoWaypoint,route.length-1)];if(Math.hypot(robot.x-goal.x,robot.y-goal.y)<10&&autoWaypoint<route.length-1){autoWaypoint++;goal=route[autoWaypoint];}const desired=Math.atan2(goal.y-robot.y,goal.x-robot.x);let diff=Math.atan2(Math.sin(desired-robot.a),Math.cos(desired-robot.a));turn=Math.max(-1,Math.min(1,diff*3));drive=Math.abs(diff)<.15?1:0;}
 else{turn=(keys.right?1:0)-(keys.left?1:0);drive=(keys.forward?1:0)-(keys.back?1:0);}
 robot.a+=turn*2.9*dt;const nx=robot.x+Math.cos(robot.a)*drive*155*dt,ny=robot.y+Math.sin(robot.a)*drive*155*dt;
 if(!collision(nx,ny)){robot.x=nx;robot.y=ny}else if(Math.abs(drive)>.01&&cooldown===0){score=Math.max(0,score-1);cooldown=.5;update();}
-const dist=p=>Math.hypot(robot.x-p.x,robot.y-p.y);if(!carrying&&dist(pickup)<35){carrying=true;score+=10;update()}else if(carrying&&dist(drop)<45){carrying=false;deliveries++;score+=100;robot.x=95;robot.y=480;robot.a=-Math.PI/2;update();}}
+const dist=p=>Math.hypot(robot.x-p.x,robot.y-p.y);if(!carrying&&dist(pickup)<35){carrying=true;autoWaypoint=0;score+=10;update()}else if(carrying&&dist(drop)<45){carrying=false;deliveries++;score+=100;robot.x=95;robot.y=480;robot.a=-Math.PI/2;autoWaypoint=0;update();}}
 function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#194b4f';ctx.fillRect(0,0,W,H);ctx.fillStyle='#285e65';for(let x=0;x<W;x+=80)for(let y=0;y<H;y+=80){ctx.strokeStyle='#346e73';ctx.strokeRect(x,y,80,80);}
 ctx.fillStyle='#a2b3ba';for(const o of obstacles){ctx.fillRect(o.x,o.y,o.w,o.h);ctx.fillStyle='#667d8b';ctx.fillRect(o.x+8,o.y+8,o.w-16,o.h-16);ctx.fillStyle='#a2b3ba';}
 ctx.beginPath();ctx.arc(pickup.x,pickup.y,34,0,Math.PI*2);ctx.fillStyle='#257ce5';ctx.fill();ctx.beginPath();ctx.arc(drop.x,drop.y,43,0,Math.PI*2);ctx.fillStyle='#16a76b';ctx.fill();ctx.fillStyle='white';ctx.font='bold 18px system-ui';ctx.textAlign='center';ctx.fillText('PICKUP',pickup.x,pickup.y-43);ctx.fillText('DELIVER',drop.x,drop.y-52);
@@ -28,7 +28,7 @@ if(!carrying){ctx.fillStyle='#8ce8ff';ctx.fillRect(pickup.x-12,pickup.y-12,24,24
 ctx.save();ctx.translate(robot.x,robot.y);ctx.rotate(robot.a);ctx.fillStyle='#ffbd59';ctx.fillRect(-22,-17,44,34);ctx.fillStyle='#0a2834';ctx.fillRect(9,-11,12,22);ctx.fillStyle='#ffffff';ctx.fillRect(-17,-22,12,6);ctx.fillRect(-17,16,12,6);if(carrying){ctx.fillStyle='#8ce8ff';ctx.fillRect(-9,-9,18,18);}ctx.restore();}
 function frame(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;step(dt);draw();requestAnimationFrame(frame);}
 function bind(id,key){const b=el(id);const down=e=>{e.preventDefault();keys[key]=true;try{b.setPointerCapture(e.pointerId)}catch{}};const up=e=>{e.preventDefault();keys[key]=false;};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',()=>keys[key]=false);}
-bind('left','left');bind('right','right');bind('forward','forward');bind('back','back');el('auto').addEventListener('click',()=>{auto=!auto;keys={};update()});el('reset').addEventListener('click',reset);
+bind('left','left');bind('right','right');bind('forward','forward');bind('back','back');el('auto').addEventListener('click',()=>{auto=!auto;keys={};autoWaypoint=0;update()});el('reset').addEventListener('click',reset);
 const map={ArrowUp:'forward',KeyW:'forward',ArrowDown:'back',KeyS:'back',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
 window.addEventListener('keydown',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=true}});window.addEventListener('keyup',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=false}});window.addEventListener('blur',()=>keys={});reset();requestAnimationFrame(frame);
 })();
