@@ -50,9 +50,9 @@ test('pickup, delivery, collision penalty and reset are implemented', () => {
 });
 
 test('scripted avoidance is identified as a demo, not trained AI', () => {
-  assert.match(app, /if\(auto\)\{const goal=carrying\?drop:pickup/);
-  assert.match(app, /collision\(ax,ay\)/);
-  assert.match(html, /simple scripted obstacle-avoidance demonstration, not trained machine learning/);
+  assert.match(app, /if\(auto\)\{const route=carrying\?/);
+  assert.match(app, /collision\(nx,ny\)/);
+  assert.match(html, /Scripted AI follows fixed waypoints around obstacles in this arena; it is not trained machine learning/);
 });
 
 test('prototype has no backend, purchase flow or external dependency', () => {
@@ -211,4 +211,39 @@ test('manual controls complete a full pickup-to-delivery route and award 110 poi
   getElementById('reset').handlers.get('click')();
   assert.equal(getElementById('score').textContent, 'Score: 0');
   assert.equal(getElementById('deliveries').textContent, 'Deliveries: 0');
+});
+
+test('scripted AI completes a delivery using fixed safe waypoints', () => {
+  const elements = new Map();
+  const ctx = new Proxy({}, { get: () => () => {} });
+  let nextFrame;
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '', handlers,
+        getContext: () => ctx,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute() {},
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener() {} },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  getElementById('auto').handlers.get('click')();
+  let deliveries = 0;
+  for (let i = 1; i <= 1500; i++) {
+    const callback = nextFrame;
+    assert.equal(typeof callback, 'function');
+    nextFrame = undefined;
+    callback(i * 20);
+    deliveries = Number(getElementById('deliveries').textContent.split(': ')[1]);
+    if (deliveries > 0) break;
+  }
+  assert.equal(deliveries, 1, 'Scripted route should finish one delivery within 30 simulated seconds');
+  assert.equal(getElementById('score').textContent, 'Score: 110');
 });
