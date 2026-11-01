@@ -627,7 +627,7 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assert.equal(await evaluate("document.activeElement.id"), 'profileSearch',
       'Clearing profile search returns focus to its input');
     assert.equal(await evaluate("document.querySelector('#profileSearch').value"), '');
-    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing all 2 demo profiles/);
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing all 2 demo profile\(s\)/);
     assert.doesNotMatch(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /hidden by search/);
     assert.equal(await evaluate("[...document.querySelectorAll('#myrobots article .status')].filter(x=>x.textContent.startsWith('Selected for generic')).length"), 1,
       'Clearing the filter restores the selected profile badge');
