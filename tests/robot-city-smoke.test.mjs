@@ -247,3 +247,76 @@ test('scripted AI completes a delivery using fixed safe waypoints', () => {
   assert.equal(deliveries, 1, 'Scripted route should finish one delivery within 30 simulated seconds');
   assert.equal(getElementById('score').textContent, 'Score: 110');
 });
+
+test('touch controls drive, reverse and stop on release, cancel, lost capture and blur', () => {
+  const elements = new Map();
+  const listeners = new Map();
+  let nextFrame, time = 0, robotPosition;
+  const ctx = new Proxy({
+    translate(x, y) { robotPosition = { x, y }; },
+  }, { get(target, key) { return target[key] ?? (() => {}); } });
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '', handlers,
+        getContext: () => ctx,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute() {},
+        setPointerCapture() {},
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: { getElementById },
+    window: { addEventListener(type, fn) { listeners.set(type, fn); } },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  function frames(count) {
+    for (let i = 0; i < count; i++) {
+      time += 20;
+      const callback = nextFrame;
+      assert.equal(typeof callback, 'function');
+      nextFrame = undefined;
+      callback(time);
+    }
+  }
+  function pointer(id, type) {
+    const handler = getElementById(id).handlers.get(type);
+    assert.equal(typeof handler, 'function');
+    handler({ pointerId: 7, preventDefault() {} });
+  }
+  frames(1);
+  const startY = robotPosition.y;
+  pointer('forward', 'pointerdown');
+  frames(20);
+  const forwardY = robotPosition.y;
+  assert.ok(forwardY < startY - 30, 'Touch Drive should move the robot forward');
+
+  pointer('forward', 'pointerup');
+  frames(5);
+  assert.equal(robotPosition.y, forwardY, 'Releasing Drive must stop movement');
+
+  pointer('back', 'pointerdown');
+  frames(10);
+  const reverseY = robotPosition.y;
+  assert.ok(reverseY > forwardY + 10, 'Touch Reverse should move the robot backward');
+  pointer('back', 'pointercancel');
+  frames(5);
+  assert.equal(robotPosition.y, reverseY, 'Pointer cancellation must stop Reverse');
+
+  pointer('forward', 'pointerdown');
+  frames(4);
+  const beforeLostCapture = robotPosition.y;
+  getElementById('forward').handlers.get('lostpointercapture')();
+  frames(5);
+  assert.equal(robotPosition.y, beforeLostCapture, 'Lost pointer capture must stop Drive');
+
+  pointer('back', 'pointerdown');
+  frames(3);
+  const beforeBlur = robotPosition.y;
+  listeners.get('blur')();
+  frames(5);
+  assert.equal(robotPosition.y, beforeBlur, 'Leaving the browser window must stop movement');
+});
