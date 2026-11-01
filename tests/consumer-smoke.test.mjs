@@ -1720,6 +1720,15 @@ test('duplicate nicknames have distinct profile action labels and a specific rem
   newest.children[6].onclick();
   assert.deepEqual(context.mine.map(profile => profile.id), ['demo-1']);
   assert.equal(saves, 1, 'Confirming removes only the named profile');
+  elements.profileSearch.value = 'Study';
+  context.renderMyRobots();
+  elements.myrobots.children[0].children[6].onclick();
+  assert.equal(context.mine.length, 0, 'Removing the final demo profile empties the list');
+  assert.equal(elements.profileSearch.value, '', 'Last removal clears the stale search query');
+  assert.equal(elements.profileSearch.disabled, true, 'Search is disabled with no saved profiles');
+  assert.equal(elements.clearProfileSearch.hidden, true, 'No orphaned Clear search button remains');
+  assert.match(elements.profileSearchSummary.textContent, /No demo profiles to search/);
+  assert.equal(saves, 2, 'Both confirmed removals persist the profile changes');
 });
 
 test('Services picker changes local demo context without suggesting compatibility or bookings', () => {
