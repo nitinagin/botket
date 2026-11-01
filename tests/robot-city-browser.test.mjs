@@ -131,6 +131,19 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate(`document.getElementById('back').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 12, pointerType: 'touch' }))`);
     assert.ok(await evaluate('window.__robotPose.y') > movedY + 10, 'Touch Reverse must move robot backward');
 
+    // Browser regression: a cancelled touch or lost pointer capture must not
+    // leave Drive latched and move the robot without user input.
+    for (const [pointerId, stopEvent] of [[13, 'pointercancel'], [14, 'lostpointercapture']]) {
+      await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: ${pointerId}, pointerType: 'touch' }))`);
+      await sleep(180);
+      await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('${stopEvent}', { bubbles: true, pointerId: ${pointerId}, pointerType: 'touch' }))`);
+      await sleep(90);
+      const stoppedY = await evaluate('window.__robotPose.y');
+      await sleep(150);
+      assert.equal(await evaluate('window.__robotPose.y'), stoppedY,
+        `${stopEvent} must stop touch Drive in Chrome`);
+    }
+
     await evaluate(`document.getElementById('reset').click(); document.getElementById('auto').click()`);
     assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'true');
     assert.equal(await evaluate('document.getElementById("mode").textContent'), 'Mode: Scripted AI');
