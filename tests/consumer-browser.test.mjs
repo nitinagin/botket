@@ -192,6 +192,17 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     assertAboveNav(discoverFilters, 'Discover filters and search');
     assertAboveNav(await measureControls('#products article:first-child .concept-actions button'), 'Discover first concept actions');
     assertReachable(await bringAboveNav('#products .concept-actions button'), 'Discover concept actions');
+    // Whitespace-only input is not a filter, but it must still be easy to clear.
+    await evaluate("document.querySelector('#robotSearch').value='   '; document.querySelector('#robotSearch').dispatchEvent(new Event('input', { bubbles: true }))");
+    assert.equal(await evaluate("document.querySelector('#clearRobotSearch').hidden"), false,
+      'Discover keeps Clear search available for whitespace-only input');
+    assert.equal(await evaluate("document.querySelectorAll('#products [data-add]').length"), 3,
+      'Whitespace-only Discover search does not hide concepts');
+    await evaluate("document.querySelector('#clearRobotSearch').click()");
+    assert.equal(await evaluate("document.querySelector('#robotSearch').value"), '',
+      'Discover Clear search removes whitespace');
+    assert.equal(await evaluate("document.activeElement.id"), 'robotSearch',
+      'Discover Clear search restores keyboard focus');
     await evaluate("document.querySelector('#robotSearch').value='home'; document.querySelector('#robotSearch').dispatchEvent(new Event('input', { bubbles: true }))");
     await until(() => evaluate("document.querySelector('#clearRobotSearch').hidden === false && document.querySelectorAll('#products .concept-actions button').length === 2"), 'Discover search match shown');
     assertAboveNav(await measureControls('#store #clearRobotSearch, #products .concept-actions button'), 'Discover search match');
@@ -386,6 +397,16 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     const savedRobots = await bringAboveNav(filledRobots);
     assert.equal(savedRobots.length, 11, 'Filled My Robots shows the skills handoff, profile form, search, clear, profile actions, and cart review');
     assertReachable(savedRobots, 'Filled My Robots');
+    await evaluate("document.querySelector('#profileSearch').value='   '; document.querySelector('#profileSearch').dispatchEvent(new Event('input', { bubbles: true }))");
+    assert.equal(await evaluate("document.querySelector('#clearProfileSearch').hidden"), false,
+      'My Robots keeps Clear search available for whitespace-only input');
+    assert.match(await evaluate("document.querySelector('#profileSearchSummary').textContent"), /Showing all 1 demo profile/,
+      'Whitespace-only profile search does not filter saved profiles');
+    await evaluate("document.querySelector('#clearProfileSearch').click()");
+    assert.equal(await evaluate("document.querySelector('#profileSearch').value"), '',
+      'My Robots Clear search removes whitespace');
+    assert.equal(await evaluate("document.activeElement.id"), 'profileSearch',
+      'My Robots Clear search restores keyboard focus');
     const savedOverflow = await evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
     assert.equal(savedOverflow, 0, 'Filled My Robots overflows horizontally by ' + savedOverflow + 'px');
     await evaluate("document.querySelector('#openSkillsFromRobots').click()");
