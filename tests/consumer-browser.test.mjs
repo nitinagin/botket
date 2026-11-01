@@ -519,6 +519,17 @@ test('real Chrome mobile journey stays demo-only from Discover through Services'
     await evaluate("document.querySelector('#servicecards [data-add=\"s2\"]').click()");
     await until(() => evaluate("document.querySelector('#cart').hidden === false && document.querySelector('#count').textContent === '1'"),
       'Service-only demo cart opened');
+    // A filled service-origin checkout must offer a truthful route back to Services.
+    assert.equal(await evaluate("document.querySelector('#browseFromCheckout').textContent"),
+      'Continue browsing service previews →', 'Service checkout browse action must name Services');
+    await evaluate("document.querySelector('#browseFromCheckout').click()");
+    assert.equal(await evaluate("document.querySelector('#services').hidden"), false,
+      'Continue browsing from service checkout must return to Services');
+    assert.equal(await evaluate("document.querySelector('#count').textContent"), '1',
+      'Browsing back must preserve the demo service cart');
+    await evaluate("document.querySelector('#reviewServicesCart').click()");
+    assert.equal(await evaluate("document.querySelector('#cart').hidden"), false,
+      'Review demo cart must reopen Checkout after browsing Services');
     await evaluate("document.querySelector('#preview').click()");
     assert.match(await evaluate("document.querySelector('#result').textContent"),
       /0 robot concept\(s\), 1 service preview\(s\)/,
