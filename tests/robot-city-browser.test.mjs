@@ -137,6 +137,32 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate('document.getElementById("reset").click()');
     assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'false');
 
+    // Regression coverage for narrow phones and iPad landscape before release.
+    // CDP device metrics change the real CSS viewport; this is NOT Safari QA.
+    for (const [width, height, mobileViewport] of [
+      [320, 640, true], [430, 932, true], [768, 1024, true], [1180, 820, true]
+    ]) {
+      await send('Emulation.setDeviceMetricsOverride', {
+        width, height, deviceScaleFactor: 1, mobile: mobileViewport
+      });
+      const layout = await evaluate(`(() => ({
+        viewport: innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        canvasWidth: document.getElementById('game').getBoundingClientRect().width,
+        buttons: [...document.querySelectorAll('.controls button')].map(button => ({
+          width: button.getBoundingClientRect().width,
+          height: button.getBoundingClientRect().height
+        }))
+      }))()`);
+      assert.ok(layout.documentWidth <= layout.viewport + 1,
+        `Robot City must not scroll horizontally at ${width}x${height}`);
+      assert.ok(layout.canvasWidth <= layout.viewport,
+        `Robot City canvas must fit at ${width}x${height}`);
+      assert.equal(layout.buttons.length, 6);
+      assert.ok(layout.buttons.every(button => button.width >= 44 && button.height >= 44),
+        `All control targets must be at least 44px at ${width}x${height}`);
+    }
+
     await send('Emulation.setDeviceMetricsOverride', { width: 820, height: 1180, deviceScaleFactor: 2, mobile: true });
     const tablet = await evaluate(`({ viewport: innerWidth, width: document.documentElement.scrollWidth, canvas: document.getElementById('game').getBoundingClientRect().width })`);
     assert.ok(tablet.width <= tablet.viewport + 1 && tablet.canvas <= tablet.viewport, 'iPad-sized Chrome viewport must fit');
@@ -150,6 +176,17 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
     assert.ok(await evaluate('window.__robotPose.y') < desktopStart - 15, 'Desktop ArrowUp must move robot');
     assert.deepEqual(await evaluate('window.__robotErrors'), []);
+
+    // A blurred tab must clear a held keyboard command (no runaway robot).
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }))`);
+    await sleep(180);
+    await evaluate(`window.dispatchEvent(new Event('blur'))`);
+    await sleep(100);
+    const blurStopY = await evaluate('window.__robotPose.y');
+    await sleep(140);
+    assert.equal(await evaluate('window.__robotPose.y'), blurStopY,
+      'Window blur must stop a held desktop driving key');
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
 
     // Browser-level gameplay acceptance: the scripted route must complete a
     // real pickup and delivery, not merely toggle the mode label.
