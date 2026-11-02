@@ -26,7 +26,7 @@ test('arena links instructions for assistive technology', () => {
 });
 
 test('Phase 1 uses a single named canvas arena and visible status', () => {
-  assert.match(html, /<canvas id="game" width="960" height="600" aria-label="[^"]+"/);
+  assert.match(html, /<canvas id="game" width="960" height="600" tabindex="0" aria-label="[^"]+"/);
   assert.match(html, /id="status" role="status"/);
   for (const id of ['score', 'deliveries', 'mode', 'status', 'game', 'left', 'forward', 'back', 'right', 'auto', 'reset']) {
     assert.match(html, new RegExp('id="' + id + '"'));
