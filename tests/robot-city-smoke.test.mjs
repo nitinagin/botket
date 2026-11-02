@@ -476,4 +476,30 @@ test('hidden browser tab releases held driving input without resuming on return'
   windowListeners.get('keydown')({ code: 'ArrowUp', preventDefault() {} });
   frames(5);
   assert.ok(robotPosition.y < stoppedY - 5, 'A new keydown must still drive normally');
+
+  // Backgrounding must also suspend scripted driving; clearing keys alone
+  // is insufficient because autonomous waypoints do not read manual keys.
+  for (const eventName of ['blur', 'pagehide', 'visibilitychange']) {
+    getElementById('reset').handlers.get('click')();
+    frames(1);
+    const startPose = { ...robotPosition };
+    getElementById('auto').handlers.get('click')();
+    assert.equal(getElementById('mode').textContent, 'Mode: Scripted AI');
+    frames(40);
+    assert.notDeepEqual(robotPosition, startPose,
+      'Scripted mode must move before ' + eventName + ' suspends it');
+    const pausedPose = { ...robotPosition };
+    if (eventName === 'visibilitychange') {
+      hidden = true;
+      documentListeners.get('visibilitychange')();
+      hidden = false;
+    } else {
+      windowListeners.get(eventName)();
+    }
+    assert.equal(getElementById('mode').textContent, 'Mode: Manual',
+      eventName + ' must visibly turn off scripted driving');
+    frames(8);
+    assert.deepEqual(robotPosition, pausedPose,
+      eventName + ' must stop scripted movement until explicitly restarted');
+  }
 });
