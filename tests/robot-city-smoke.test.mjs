@@ -22,6 +22,15 @@ test('Phase 1 uses a single named canvas arena and visible status', () => {
   assert.equal(new Set(ids).size, ids.length, 'Element IDs must be unique');
 });
 
+test('Robot City provides keyboard skip navigation and touch-friendly home access', () => {
+  assert.match(html, /class="skip-link" href="#main-content">Skip to main content<\/a>/);
+  assert.match(html, /<main id="main-content" tabindex="-1">/);
+  assert.match(html, /\.skip-link:focus\{top:8px\}/);
+  assert.match(html, /class="home-link" href="index\.html"/);
+  assert.match(html, /\.home-link\{[^}]*min-height:44px/);
+  assert.match(html, /a:focus-visible,button:focus-visible\{outline:3px solid/);
+});
+
 test('keyboard and pointer controls support desktop and tablet', () => {
   assert.match(app, /ArrowUp:'forward'/);
   assert.match(app, /ArrowDown:'back'/);
