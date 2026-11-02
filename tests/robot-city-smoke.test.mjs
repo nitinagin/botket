@@ -388,6 +388,40 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   const afterDriveCancel = { ...robotPosition };
   frames(5);
   assert.deepEqual(robotPosition, afterDriveCancel, 'Cancelling the final Drive touch must stop movement');
+
+  // Restart must clear a held touch, even if the finger remains on the screen.
+  // A late pointerup from that old touch must not reactivate movement.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  pointer('forward', 'pointerdown', 31);
+  frames(10);
+  assert.ok(robotPosition.y < 460, 'A held touch must move before Restart');
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  const afterTouchReset = { ...robotPosition };
+  assert.deepEqual(afterTouchReset, { x: 95, y: 480 });
+  frames(5);
+  assert.deepEqual(robotPosition, afterTouchReset, 'Restart must clear a held touch command');
+  pointer('forward', 'pointerup', 31);
+  frames(5);
+  assert.deepEqual(robotPosition, afterTouchReset, 'Late touch release must not restart movement');
+
+  // Switching Manual -> Scripted -> Manual while a touch is held must
+  // never resume the stale touch when scripted navigation is turned off.
+  pointer('forward', 'pointerdown', 32);
+  frames(10);
+  assert.ok(robotPosition.y < afterTouchReset.y - 10, 'A new touch must still work');
+  getElementById('auto').handlers.get('click')();
+  frames(10);
+  getElementById('auto').handlers.get('click')();
+  frames(5);
+  const afterModeSwitch = { ...robotPosition };
+  frames(8);
+  assert.deepEqual(robotPosition, afterModeSwitch,
+    'Returning to Manual must not resume a touch held before scripted mode');
+  pointer('forward', 'pointerup', 32);
+  frames(5);
+  assert.deepEqual(robotPosition, afterModeSwitch, 'Late touch release after mode switch must remain safe');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
