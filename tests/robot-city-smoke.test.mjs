@@ -475,6 +475,27 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   assert.deepEqual(robotPosition, afterKeyboardRelease,
     'Releasing the final keyboard key must stop movement');
 
+  // Keyboard Drive and touch Reverse can be held at the same time on a
+  // tablet with an external keyboard. Opposite commands should cancel,
+  // and releasing one must preserve the other input source.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  listeners.get('keydown')({ code: 'KeyW', preventDefault() {} });
+  pointer('back', 'pointerdown', 65);
+  const neutralPose = { ...robotPosition };
+  frames(8);
+  assert.deepEqual(robotPosition, neutralPose,
+    'Opposing keyboard Drive and touch Reverse must not move the robot');
+  pointer('back', 'pointerup', 65);
+  frames(8);
+  assert.ok(robotPosition.y < neutralPose.y - 10,
+    'Releasing touch Reverse must preserve the held keyboard Drive command');
+  listeners.get('keyup')({ code: 'KeyW', preventDefault() {} });
+  const afterOppositeRelease = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, afterOppositeRelease,
+    'Releasing the final keyboard command must stop movement');
+
   // WASD and arrow keys are independent physical keys, even when they map
   // to the same action. Releasing one must not cancel the other.
   getElementById('reset').handlers.get('click')();
