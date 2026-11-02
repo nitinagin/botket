@@ -12,6 +12,17 @@ test('Robot City has one self-contained, parseable application script', () => {
   assert.doesNotThrow(() => new Script(app, { filename: 'robot-city.html' }));
 });
 
+test('arena links instructions for assistive technology', () => {
+  const canvas = html.match(/<canvas\b[^>]*id="game"[^>]*>/)?.[0];
+  const hint = html.match(/<p\b[^>]*id="robotInstructions"[^>]*>([\s\S]*?)<\/p>/)?.[1];
+  assert.ok(canvas, 'Robot City arena must exist');
+  assert.match(canvas, /aria-describedby="robotInstructions"/);
+  assert.ok(hint, 'Canvas instructions must have a matching description target');
+  assert.match(hint, /Desktop: Arrow keys or WASD/);
+  assert.match(hint, /Tablet: hold Drive, Reverse, or Turn controls/);
+  assert.match(hint, /it is not trained machine learning/);
+});
+
 test('Phase 1 uses a single named canvas arena and visible status', () => {
   assert.match(html, /<canvas id="game" width="960" height="600" aria-label="[^"]+"/);
   assert.match(html, /id="status" role="status"/);
