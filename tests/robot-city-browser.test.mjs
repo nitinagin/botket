@@ -185,9 +185,18 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     assert.ok(desktop.width <= desktop.viewport + 1, 'Desktop must not scroll horizontally');
     const desktopStart = await evaluate('window.__robotPose.y');
     await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }))`);
-    await sleep(350);
-    await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
-    assert.ok(await evaluate('window.__robotPose.y') < desktopStart - 15, 'Desktop ArrowUp must move robot');
+    try {
+      // A fixed 350ms sleep can race Chrome's first animation frame after
+      // resizing from mobile to desktop. Require actual movement, but allow
+      // up to 3 seconds for the browser to schedule frames under CI load.
+      // A stuck input or non-moving robot must still fail the test.
+      await waitFor(async () => {
+        const y = await evaluate('window.__robotPose.y');
+        return y < desktopStart - 15;
+      }, 'desktop ArrowUp movement', 3000);
+    } finally {
+      await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
+    }
     assert.deepEqual(await evaluate('window.__robotErrors'), []);
 
     // A blurred tab must clear a held keyboard command (no runaway robot).
