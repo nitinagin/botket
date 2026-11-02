@@ -291,10 +291,10 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
       callback(time);
     }
   }
-  function pointer(id, type) {
+  function pointer(id, type, pointerId = 7) {
     const handler = getElementById(id).handlers.get(type);
     assert.equal(typeof handler, 'function');
-    handler({ pointerId: 7, preventDefault() {} });
+    handler({ pointerId, preventDefault() {} });
   }
   frames(1);
   const startY = robotPosition.y;
@@ -337,6 +337,22 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   listeners.get('pagehide')();
   frames(5);
   assert.equal(robotPosition.y, beforePagehide, 'Pagehide must release a held Drive control');
+
+  // A two-finger tablet gesture must allow driving and turning together.
+  // Different pointer IDs model separate touches on the two controls.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  const multiStart = { ...robotPosition };
+  pointer('forward', 'pointerdown', 21);
+  pointer('right', 'pointerdown', 22);
+  frames(15);
+  const multiEnd = { ...robotPosition };
+  assert.ok(multiEnd.x > multiStart.x + 5, 'Two-finger Drive + Turn must steer to the right');
+  assert.ok(multiEnd.y < multiStart.y - 15, 'Two-finger Drive + Turn must still move forward');
+  pointer('right', 'pointerup', 22);
+  pointer('forward', 'pointerup', 21);
+  frames(5);
+  assert.deepEqual(robotPosition, multiEnd, 'Releasing both touches must stop the robot');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
