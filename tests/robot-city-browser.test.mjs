@@ -201,6 +201,34 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
       'Window blur must stop a held desktop driving key');
     await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
 
+    // Safety regression: resetting while a driving key is still held must
+    // clear the command. Switching Manual -> Scripted AI -> Manual must not
+    // reactivate the stale key either (important when a tablet loses focus).
+    await evaluate('document.getElementById("reset").click()');
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }))`);
+    await sleep(180);
+    assert.ok(await evaluate('window.__robotPose.y') < 465, 'Held keyboard Drive must move before reset');
+    await evaluate('document.getElementById("reset").click()');
+    await sleep(100);
+    const resetStopY = await evaluate('window.__robotPose.y');
+    await sleep(150);
+    assert.equal(await evaluate('window.__robotPose.y'), resetStopY,
+      'Restart must clear a held keyboard command');
+
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }))`);
+    await sleep(120);
+    await evaluate('document.getElementById("auto").click()');
+    assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'true');
+    await sleep(160);
+    await evaluate('document.getElementById("auto").click()');
+    assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'false');
+    await sleep(100);
+    const modeStopY = await evaluate('window.__robotPose.y');
+    await sleep(150);
+    assert.equal(await evaluate('window.__robotPose.y'), modeStopY,
+      'Returning to Manual must not resume a stale held driving key');
+    await evaluate(`window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowUp', bubbles: true }))`);
+
     // Browser-level gameplay acceptance: the scripted route must complete a
     // real pickup and delivery, not merely toggle the mode label.
     await evaluate('document.getElementById("reset").click(); document.getElementById("auto").click()');
