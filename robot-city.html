@@ -13,7 +13,7 @@ const c=document.getElementById('game'),ctx=c.getContext('2d'),W=c.width,H=c.hei
 const obstacles=[{x:225,y:100,w:80,h:150},{x:450,y:40,w:90,h:190},{x:660,y:160,w:100,h:140},{x:330,y:360,w:100,h:120},{x:590,y:410,w:90,h:100}];
 const pickup={x:135,y:125},drop={x:850,y:495};let robot,score,deliveries,carrying,auto,keys={},touches={},last=0,cooldown=0,autoWaypoint=0;
 const el=id=>document.getElementById(id);
-const held=key=>!!keys[key]||!!touches[key]?.size;
+const held=key=>Object.keys(keys).some(code=>keys[code]&&map[code]===key)||!!touches[key]?.size;
 function reset(){robot={x:95,y:480,a:-Math.PI/2};score=0;deliveries=0;carrying=false;auto=false;keys={};touches={};cooldown=0;autoWaypoint=0;update();}
 function update(){el('score').textContent='Score: '+score;el('deliveries').textContent='Deliveries: '+deliveries;el('mode').textContent='Mode: '+(auto?'Scripted AI':'Manual');el('auto').textContent='Scripted AI: '+(auto?'On':'Off');el('auto').setAttribute('aria-pressed',String(auto));el('status').textContent=carrying?'Deliver to the green zone':'Pick up the blue package';}
 function collision(x,y){const r=20;return x<r||x>W-r||y<r||y>H-r||obstacles.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h);}
@@ -32,6 +32,6 @@ function frame(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;step(dt);draw()
 function bind(id,key){const b=el(id);const down=e=>{e.preventDefault();(touches[key]??=new Set()).add(e.pointerId);try{b.setPointerCapture(e.pointerId)}catch{}};const up=e=>{e.preventDefault();touches[key]?.delete(e.pointerId);};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',e=>{if(e?.pointerId===undefined)touches[key]?.clear();else touches[key]?.delete(e.pointerId);});}
 bind('left','left');bind('right','right');bind('forward','forward');bind('back','back');el('auto').addEventListener('click',()=>{auto=!auto;keys={};touches={};autoWaypoint=0;update()});el('reset').addEventListener('click',reset);
 const map={ArrowUp:'forward',KeyW:'forward',ArrowDown:'back',KeyS:'back',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
-window.addEventListener('keydown',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=true}});window.addEventListener('keyup',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=false}});function suspend(){keys={};touches={};if(auto){auto=false;autoWaypoint=0;update();}}window.addEventListener('blur',suspend);window.addEventListener('pagehide',suspend);document.addEventListener?.('visibilitychange',()=>{if(document.hidden)suspend();});reset();requestAnimationFrame(frame);
+window.addEventListener('keydown',e=>{if(map[e.code]){e.preventDefault();keys[e.code]=true}});window.addEventListener('keyup',e=>{if(map[e.code]){e.preventDefault();keys[e.code]=false}});function suspend(){keys={};touches={};if(auto){auto=false;autoWaypoint=0;update();}}window.addEventListener('blur',suspend);window.addEventListener('pagehide',suspend);document.addEventListener?.('visibilitychange',()=>{if(document.hidden)suspend();});reset();requestAnimationFrame(frame);
 })();
 </script></body></html>
