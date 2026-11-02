@@ -131,6 +131,28 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate(`document.getElementById('back').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 12, pointerType: 'touch' }))`);
     assert.ok(await evaluate('window.__robotPose.y') > movedY + 10, 'Touch Reverse must move robot backward');
 
+    // Browser-level two-finger regression on a mobile-sized Chrome viewport.
+    // Synthetic PointerEvents exercise the DOM handlers; this is NOT real iPad Safari QA.
+    await evaluate('document.getElementById("reset").click()');
+    const multiStart = await evaluate('({ ...window.__robotPose })');
+    await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 31, pointerType: 'touch' }));
+      document.getElementById('right').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 32, pointerType: 'touch' }))`);
+    try {
+      await waitFor(async () => {
+        const pose = await evaluate('({ ...window.__robotPose })');
+        return pose.x > multiStart.x + 8 && pose.y < multiStart.y - 12;
+      }, 'simultaneous touch Drive + Turn movement', 3000);
+    } finally {
+      await evaluate(`document.getElementById('right').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 32, pointerType: 'touch' }));
+        document.getElementById('forward').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 31, pointerType: 'touch' }))`);
+    }
+    await sleep(100);
+    const multiStopped = await evaluate('({ ...window.__robotPose })');
+    await sleep(150);
+    assert.deepEqual(await evaluate('({ ...window.__robotPose })'), multiStopped,
+      'Releasing both touch controls must stop the robot in Chrome');
+    await evaluate('document.getElementById("reset").click()');
+
     // Browser regression: a cancelled touch or lost pointer capture must not
     // leave Drive latched and move the robot without user input.
     for (const [pointerId, stopEvent] of [[13, 'pointercancel'], [14, 'lostpointercapture']]) {
