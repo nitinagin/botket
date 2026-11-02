@@ -120,6 +120,9 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     // Browser-level keyboard accessibility check: the skip link must be
     // focusable and visible when focused, not merely present in HTML.
     // Chrome is not VoiceOver or physical iPad Safari accessibility QA.
+    // Headless Chrome may have an unfocused top-level window even when
+    // document.activeElement is the link; emulate focus for :focus styling.
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const skipLink = await evaluate(`(() => {
       const link = document.querySelector('.skip-link');
       link.focus();
