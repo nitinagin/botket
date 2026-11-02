@@ -440,6 +440,24 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   assert.deepEqual(robotPosition, lastReleasePose,
     'Releasing the final Drive finger must stop movement');
 
+  // Late or unrelated pointer events must not cancel a different finger's
+  // active Drive. Safari may deliver these after touch capture changes.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  pointer('forward', 'pointerdown', 64);
+  frames(10);
+  const beforeStrayPointer = { ...robotPosition };
+  pointer('forward', 'pointerup', 999);
+  getElementById('forward').handlers.get('lostpointercapture')({ pointerId: 62 });
+  frames(8);
+  assert.ok(robotPosition.y < beforeStrayPointer.y - 10,
+    'Unrelated pointerup and late capture loss must not cancel the active Drive finger');
+  pointer('forward', 'pointerup', 64);
+  const afterRealPointerRelease = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, afterRealPointerRelease,
+    'Releasing the real Drive finger must still stop movement');
+
   // A pointer release must not cancel a simultaneously held keyboard key.
   getElementById('reset').handlers.get('click')();
   frames(1);
