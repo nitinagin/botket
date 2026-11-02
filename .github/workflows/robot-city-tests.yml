@@ -7,14 +7,14 @@ on:
       - robot-city.html
       - world.html
       - tests/world-entry.test.mjs
-      - world.html
-      - tests/world-entry.test.mjs
       - tests/robot-city-smoke.test.mjs
       - tests/robot-city-browser.test.mjs
       - .github/workflows/robot-city-tests.yml
   pull_request:
     paths:
       - robot-city.html
+      - world.html
+      - tests/world-entry.test.mjs
       - tests/robot-city-smoke.test.mjs
       - tests/robot-city-browser.test.mjs
       - .github/workflows/robot-city-tests.yml
