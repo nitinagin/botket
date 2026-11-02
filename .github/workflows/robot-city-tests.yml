@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - robot-city.html
+      - world.html
+      - tests/world-entry.test.mjs
+      - world.html
+      - tests/world-entry.test.mjs
       - tests/robot-city-smoke.test.mjs
       - tests/robot-city-browser.test.mjs
       - .github/workflows/robot-city-tests.yml
@@ -33,6 +37,8 @@ jobs:
           package-manager-cache: false
       - name: Run Robot City smoke tests
         run: node --test tests/robot-city-smoke.test.mjs
+      - name: Check BOTKET World preview entry
+        run: node --test tests/world-entry.test.mjs
       - name: Verify Chrome is installed
         run: command -v google-chrome || command -v chromium || command -v chromium-browser
       - name: Run Robot City browser controls test
