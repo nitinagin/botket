@@ -39,3 +39,25 @@ test('BOTKET World provides skip navigation and touch-friendly home link', () =>
   assert.match(html, /\.home-link\{[^}]*min-height:44px/);
   assert.match(html, /a:focus-visible\{outline:3px solid/);
 });
+
+// Guard against broken standalone navigation before the preview is linked from the main site.
+test('BOTKET World local navigation and accessible heading references remain valid', () => {
+  const ids = [...html.matchAll(/\\bid="([^"]+)"/g)].map(([, id]) => id);
+  assert.equal(new Set(ids).size, ids.length, 'Element IDs must be unique');
+  assert.equal((html.match(/<main\\b/g) ?? []).length, 1, 'Exactly one main landmark is required');
+  assert.equal((html.match(/<h1\\b/g) ?? []).length, 1, 'Exactly one page-level heading is required');
+
+  for (const [, references] of html.matchAll(/\\baria-labelledby="([^"]+)"/g)) {
+    for (const id of references.trim().split(/\\s+/)) {
+      assert.ok(ids.includes(id), 'aria-labelledby must resolve: ' + id);
+    }
+  }
+  for (const [, href] of html.matchAll(/<a\\b[^>]*\\bhref="([^"]+)"/g)) {
+    assert.doesNotMatch(href, /^(?:https?:|\\/\\/|javascript:)/i, 'Preview links must stay local');
+    if (href.startsWith('#')) {
+      assert.ok(ids.includes(href.slice(1)), 'Anchor target must exist: ' + href);
+    } else {
+      assert.ok(existsSync(new URL('../' + href, import.meta.url)), 'Local link must exist: ' + href);
+    }
+  }
+});
