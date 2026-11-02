@@ -162,7 +162,16 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
         const pose = await evaluate('({ ...window.__robotPose })');
         return pose.x > multiStart.x + 8 && pose.y < multiStart.y - 12;
       }, 'simultaneous touch Drive + Turn movement', 3000);
+      // Releasing only the steering finger must leave the separate Drive
+      // finger active. Check actual movement, not merely the key state.
+      await evaluate(`document.getElementById('right').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 32, pointerType: 'touch' }))`);
+      const afterSteerRelease = await evaluate('({ ...window.__robotPose })');
+      await waitFor(async () => {
+        const pose = await evaluate('({ ...window.__robotPose })');
+        return Math.hypot(pose.x - afterSteerRelease.x, pose.y - afterSteerRelease.y) > 10;
+      }, 'Drive continuing after releasing only Turn', 3000);
     } finally {
+      // Always release both fingers, even if the intermediate check fails.
       await evaluate(`document.getElementById('right').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 32, pointerType: 'touch' }));
         document.getElementById('forward').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 31, pointerType: 'touch' }))`);
     }
