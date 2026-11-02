@@ -398,3 +398,57 @@ test('manual pickup can hand off to scripted AI and return to manual safely', ()
   frames(50);
   assert.equal(getElementById('deliveries').textContent, 'Deliveries: 1');
 });
+
+test('hidden browser tab releases held driving input without resuming on return', () => {
+  const elements = new Map(), windowListeners = new Map(), documentListeners = new Map();
+  let hidden = false, nextFrame, time = 0, robotPosition;
+  const ctx = new Proxy({ translate(x, y) { robotPosition = { x, y }; } },
+    { get(target, key) { return target[key] ?? (() => {}); } });
+  function getElementById(id) {
+    if (!elements.has(id)) {
+      const handlers = new Map();
+      elements.set(id, {
+        width: 960, height: 600, textContent: '',
+        getContext: () => ctx,
+        addEventListener(type, fn) { handlers.set(type, fn); },
+        setAttribute() {}, handlers,
+      });
+    }
+    return elements.get(id);
+  }
+  new Script(app).runInNewContext({
+    document: {
+      getElementById,
+      addEventListener(type, fn) { documentListeners.set(type, fn); },
+      get hidden() { return hidden; },
+    },
+    window: { addEventListener(type, fn) { windowListeners.set(type, fn); } },
+    requestAnimationFrame(fn) { nextFrame = fn; },
+  });
+  function frames(count) {
+    for (let i = 0; i < count; i++) {
+      const fn = nextFrame;
+      assert.equal(typeof fn, 'function');
+      nextFrame = undefined;
+      fn(time += 20);
+    }
+  }
+  frames(1);
+  const startY = robotPosition.y;
+  windowListeners.get('keydown')({ code: 'ArrowUp', preventDefault() {} });
+  frames(10);
+  assert.ok(robotPosition.y < startY - 10, 'Held key must move the robot');
+  hidden = true;
+  assert.equal(typeof documentListeners.get('visibilitychange'), 'function');
+  documentListeners.get('visibilitychange')();
+  const stoppedY = robotPosition.y;
+  frames(10);
+  assert.equal(robotPosition.y, stoppedY, 'Hidden tab must release held key');
+  hidden = false;
+  documentListeners.get('visibilitychange')();
+  frames(5);
+  assert.equal(robotPosition.y, stoppedY, 'Returning to tab must not resume stale key');
+  windowListeners.get('keydown')({ code: 'ArrowUp', preventDefault() {} });
+  frames(5);
+  assert.ok(robotPosition.y < stoppedY - 5, 'A new keydown must still drive normally');
+});
