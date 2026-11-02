@@ -169,6 +169,20 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await evaluate(`document.getElementById('reset').click(); document.getElementById('auto').click()`);
     assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'true');
     assert.equal(await evaluate('document.getElementById("mode").textContent'), 'Mode: Scripted AI');
+    // Scripted driving must stop on pagehide, not only manual held keys.
+    const autoStart = await evaluate('({ ...window.__robotPose })');
+    await waitFor(async () => {
+      const pose = await evaluate('({ ...window.__robotPose })');
+      return Math.hypot(pose.x - autoStart.x, pose.y - autoStart.y) > 12;
+    }, 'scripted movement before pagehide', 3000);
+    await evaluate("window.dispatchEvent(new Event('pagehide'))");
+    assert.equal(await evaluate('document.getElementById("mode").textContent'), 'Mode: Manual',
+      'Pagehide must visibly disable scripted driving');
+    await sleep(100);
+    const suspendedPose = await evaluate('({ ...window.__robotPose })');
+    await sleep(150);
+    assert.deepEqual(await evaluate('({ ...window.__robotPose })'), suspendedPose,
+      'Pagehide must stop scripted movement in Chrome');
     await evaluate('document.getElementById("reset").click()');
     assert.equal(await evaluate('document.getElementById("auto").getAttribute("aria-pressed")'), 'false');
 
