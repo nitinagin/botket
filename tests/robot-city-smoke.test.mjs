@@ -456,6 +456,24 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   frames(5);
   assert.deepEqual(robotPosition, afterKeyboardRelease,
     'Releasing the final keyboard key must stop movement');
+
+  // WASD and arrow keys are independent physical keys, even when they map
+  // to the same action. Releasing one must not cancel the other.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  listeners.get('keydown')({ code: 'KeyW', preventDefault() {} });
+  listeners.get('keydown')({ code: 'ArrowUp', preventDefault() {} });
+  frames(10);
+  const beforeAliasRelease = { ...robotPosition };
+  listeners.get('keyup')({ code: 'ArrowUp', preventDefault() {} });
+  frames(8);
+  assert.ok(robotPosition.y < beforeAliasRelease.y - 10,
+    'Releasing ArrowUp must not cancel a separately held W key');
+  listeners.get('keyup')({ code: 'KeyW', preventDefault() {} });
+  const afterAliasRelease = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, afterAliasRelease,
+    'Releasing the last key alias must stop driving');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
