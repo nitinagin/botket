@@ -17,6 +17,8 @@ test('arena links instructions for assistive technology', () => {
   const hint = html.match(/<p\b[^>]*id="robotInstructions"[^>]*>([\s\S]*?)<\/p>/)?.[1];
   assert.ok(canvas, 'Robot City arena must exist');
   assert.match(canvas, /aria-describedby="robotInstructions"/);
+  assert.match(canvas, /tabindex="0"/, 'The described canvas must be reachable by keyboard Tab');
+  assert.match(html, /canvas:focus-visible\{outline:3px solid/, 'Keyboard focus must be visible on the arena');
   assert.ok(hint, 'Canvas instructions must have a matching description target');
   assert.match(hint, /Desktop: Arrow keys or WASD/);
   assert.match(hint, /Tablet: hold Drive, Reverse, or Turn controls/);
