@@ -358,6 +358,23 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   pointer('forward', 'pointerup', 21);
   frames(5);
   assert.deepEqual(robotPosition, afterTurnRelease, 'Releasing the final Drive touch must stop the robot');
+
+  // A cancelled steering finger must not cancel the independent Drive finger.
+  // This is a deterministic DOM-handler regression, not physical iPad Safari QA.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  pointer('forward', 'pointerdown', 23);
+  pointer('left', 'pointerdown', 24);
+  frames(12);
+  pointer('left', 'pointercancel', 24);
+  const afterSteerCancel = { ...robotPosition };
+  frames(8);
+  assert.ok(Math.hypot(robotPosition.x - afterSteerCancel.x, robotPosition.y - afterSteerCancel.y) > 8,
+    'Cancelling Turn must leave the independent Drive touch active');
+  pointer('forward', 'pointercancel', 23);
+  const afterDriveCancel = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, afterDriveCancel, 'Cancelling the final Drive touch must stop movement');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
