@@ -349,10 +349,15 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   const multiEnd = { ...robotPosition };
   assert.ok(multiEnd.x > multiStart.x + 5, 'Two-finger Drive + Turn must steer to the right');
   assert.ok(multiEnd.y < multiStart.y - 15, 'Two-finger Drive + Turn must still move forward');
+  // Releasing just the steering finger must NOT cancel the other finger's Drive.
   pointer('right', 'pointerup', 22);
+  frames(8);
+  const afterTurnRelease = { ...robotPosition };
+  assert.ok(Math.hypot(afterTurnRelease.x - multiEnd.x, afterTurnRelease.y - multiEnd.y) > 8,
+    'Releasing Turn must keep the independent Drive touch active');
   pointer('forward', 'pointerup', 21);
   frames(5);
-  assert.deepEqual(robotPosition, multiEnd, 'Releasing both touches must stop the robot');
+  assert.deepEqual(robotPosition, afterTurnRelease, 'Releasing the final Drive touch must stop the robot');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
