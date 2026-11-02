@@ -117,6 +117,23 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     assert.equal(mobile.score, 'Score: 0');
     assert.deepEqual(mobile.errors, []);
 
+    // Browser-level keyboard accessibility check: the skip link must be
+    // focusable and visible when focused, not merely present in HTML.
+    // Chrome is not VoiceOver or physical iPad Safari accessibility QA.
+    const skipLink = await evaluate(`(() => {
+      const link = document.querySelector('.skip-link');
+      link.focus();
+      const result = {
+        focused: document.activeElement === link,
+        visibleTop: getComputedStyle(link).top,
+        targetExists: Boolean(document.querySelector(link.getAttribute('href')))
+      };
+      link.blur();
+      return result;
+    })()`);
+    assert.deepEqual(skipLink, { focused: true, visibleTop: '8px', targetExists: true },
+      'Keyboard skip navigation must be focusable, visible and target main content');
+
     const startY = await evaluate('window.__robotPose.y');
     await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 11, pointerType: 'touch' }))`);
     await sleep(400);
