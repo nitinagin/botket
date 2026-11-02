@@ -180,6 +180,32 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     await sleep(150);
     assert.deepEqual(await evaluate('({ ...window.__robotPose })'), multiStopped,
       'Releasing both touch controls must stop the robot in Chrome');
+    // Cancelling just the steering finger must preserve the other finger's
+    // Drive command. Synthetic Chrome PointerEvents are not physical Safari QA.
+    await evaluate('document.getElementById("reset").click()');
+    const cancelStart = await evaluate('({ ...window.__robotPose })');
+    await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 33, pointerType: 'touch' }));
+      document.getElementById('left').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 34, pointerType: 'touch' }))`);
+    try {
+      await waitFor(async () => {
+        const pose = await evaluate('({ ...window.__robotPose })');
+        return Math.hypot(pose.x - cancelStart.x, pose.y - cancelStart.y) > 14;
+      }, 'two-finger movement before steering cancellation', 3000);
+      await evaluate(`document.getElementById('left').dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 34, pointerType: 'touch' }))`);
+      const afterTurnCancel = await evaluate('({ ...window.__robotPose })');
+      await waitFor(async () => {
+        const pose = await evaluate('({ ...window.__robotPose })');
+        return Math.hypot(pose.x - afterTurnCancel.x, pose.y - afterTurnCancel.y) > 10;
+      }, 'Drive continuing after steering pointercancel', 3000);
+    } finally {
+      await evaluate(`document.getElementById('left').dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 34, pointerType: 'touch' }));
+        document.getElementById('forward').dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 33, pointerType: 'touch' }))`);
+    }
+    await sleep(100);
+    const cancelStopped = await evaluate('({ ...window.__robotPose })');
+    await sleep(150);
+    assert.deepEqual(await evaluate('({ ...window.__robotPose })'), cancelStopped,
+      'Cancelling the last touch must stop Drive in Chrome');
     await evaluate('document.getElementById("reset").click()');
 
     // Browser regression: a cancelled touch or lost pointer capture must not
