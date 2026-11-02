@@ -8,7 +8,7 @@ const html = readFileSync(pageUrl, 'utf8');
 test('BOTKET World has a usable standalone browser entry', () => {
   assert.match(html, /<title>BOTKET World — Robot City Phase 1 Preview<\/title>/);
   assert.match(html, /name="viewport"/);
-  assert.match(html, /<main>/);
+  assert.match(html, /<main id="main-content" tabindex="-1">/);
   assert.match(html, /href="robot-city\.html"/);
   assert.ok(existsSync(new URL('../robot-city.html', import.meta.url)), 'Browser game link must resolve in the repository');
   assert.match(html, /min-height:48px/, 'Preview link should have a touch-friendly target');
@@ -28,4 +28,14 @@ test('standalone entry has no data collection, payment or remote scripts', () =>
   assert.doesNotMatch(html, /\b(?:fetch|XMLHttpRequest|sendBeacon|localStorage|sessionStorage)\s*\(/i);
   assert.doesNotMatch(html, /href="https?:\/\//i);
   assert.match(html, /href="index\.html"/);
+});
+
+// Accessibility regression for keyboard users and touch navigation on the World preview.
+test('BOTKET World provides skip navigation and touch-friendly home link', () => {
+  assert.match(html, /class="skip-link" href="#main-content">Skip to main content<\/a>/);
+  assert.match(html, /<main id="main-content" tabindex="-1">/);
+  assert.match(html, /\.skip-link:focus\{top:8px\}/);
+  assert.match(html, /class="home-link" href="index\.html"/);
+  assert.match(html, /\.home-link\{[^}]*min-height:44px/);
+  assert.match(html, /a:focus-visible\{outline:3px solid/);
 });
