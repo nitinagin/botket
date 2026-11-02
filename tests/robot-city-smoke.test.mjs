@@ -319,6 +319,15 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   listeners.get('blur')();
   frames(5);
   assert.equal(robotPosition.y, beforeBlur, 'Leaving the browser window must stop movement');
+
+  // Safari can fire pagehide during navigation without a corresponding blur.
+  pointer('forward', 'pointerdown');
+  frames(3);
+  const beforePagehide = robotPosition.y;
+  assert.equal(typeof listeners.get('pagehide'), 'function');
+  listeners.get('pagehide')();
+  frames(5);
+  assert.equal(robotPosition.y, beforePagehide, 'Pagehide must release a held Drive control');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
