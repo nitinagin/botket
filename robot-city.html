@@ -30,6 +30,6 @@ function frame(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;step(dt);draw()
 function bind(id,key){const b=el(id);const down=e=>{e.preventDefault();keys[key]=true;try{b.setPointerCapture(e.pointerId)}catch{}};const up=e=>{e.preventDefault();keys[key]=false;};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',()=>keys[key]=false);}
 bind('left','left');bind('right','right');bind('forward','forward');bind('back','back');el('auto').addEventListener('click',()=>{auto=!auto;keys={};autoWaypoint=0;update()});el('reset').addEventListener('click',reset);
 const map={ArrowUp:'forward',KeyW:'forward',ArrowDown:'back',KeyS:'back',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
-window.addEventListener('keydown',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=true}});window.addEventListener('keyup',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=false}});window.addEventListener('blur',()=>keys={});reset();requestAnimationFrame(frame);
+window.addEventListener('keydown',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=true}});window.addEventListener('keyup',e=>{if(map[e.code]){e.preventDefault();keys[map[e.code]]=false}});window.addEventListener('blur',()=>keys={});window.addEventListener('pagehide',()=>keys={});reset();requestAnimationFrame(frame);
 })();
 </script></body></html>
