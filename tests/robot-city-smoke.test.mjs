@@ -546,6 +546,35 @@ test('hidden browser tab releases held driving input without resuming on return'
   frames(5);
   assert.ok(robotPosition.y < stoppedY - 5, 'A new keydown must still drive normally');
 
+  // On iPad, backgrounding can happen while a touch is held. The old
+  // pointer must not resume driving after the tab becomes visible again.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  const touchStart = { ...robotPosition };
+  const driveHandlers = getElementById('forward').handlers;
+  driveHandlers.get('pointerdown')({ pointerId: 51, preventDefault() {} });
+  frames(10);
+  assert.ok(robotPosition.y < touchStart.y - 10,
+    'Held touch must move the robot before backgrounding');
+  hidden = true;
+  documentListeners.get('visibilitychange')();
+  const touchPaused = { ...robotPosition };
+  frames(10);
+  assert.deepEqual(robotPosition, touchPaused, 'Hidden tab must release held touch');
+  hidden = false;
+  documentListeners.get('visibilitychange')();
+  frames(5);
+  assert.deepEqual(robotPosition, touchPaused,
+    'Returning to the tab must not resume a stale touch');
+  driveHandlers.get('pointerup')({ pointerId: 51, preventDefault() {} });
+  frames(5);
+  assert.deepEqual(robotPosition, touchPaused, 'Late pointerup must remain safe');
+  driveHandlers.get('pointerdown')({ pointerId: 52, preventDefault() {} });
+  frames(5);
+  assert.ok(robotPosition.y < touchPaused.y - 5,
+    'A fresh touch after foregrounding must still drive normally');
+  driveHandlers.get('pointerup')({ pointerId: 52, preventDefault() {} });
+
   // Backgrounding must also suspend scripted driving; clearing keys alone
   // is insufficient because autonomous waypoints do not read manual keys.
   for (const eventName of ['blur', 'pagehide', 'visibilitychange']) {
