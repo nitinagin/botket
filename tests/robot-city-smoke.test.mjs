@@ -422,6 +422,40 @@ test('touch controls drive, reverse and stop on release, cancel, lost capture an
   pointer('forward', 'pointerup', 32);
   frames(5);
   assert.deepEqual(robotPosition, afterModeSwitch, 'Late touch release after mode switch must remain safe');
+
+  // Two fingers on the same Drive button must not cancel each other.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  pointer('forward', 'pointerdown', 61);
+  pointer('forward', 'pointerdown', 62);
+  frames(10);
+  const firstReleasePose = { ...robotPosition };
+  pointer('forward', 'pointerup', 61);
+  frames(8);
+  assert.ok(robotPosition.y < firstReleasePose.y - 10,
+    'Releasing one of two Drive fingers must keep the other finger active');
+  pointer('forward', 'pointerup', 62);
+  const lastReleasePose = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, lastReleasePose,
+    'Releasing the final Drive finger must stop movement');
+
+  // A pointer release must not cancel a simultaneously held keyboard key.
+  getElementById('reset').handlers.get('click')();
+  frames(1);
+  listeners.get('keydown')({ code: 'ArrowUp', preventDefault() {} });
+  pointer('forward', 'pointerdown', 63);
+  frames(10);
+  pointer('forward', 'pointerup', 63);
+  const afterPointerRelease = { ...robotPosition };
+  frames(8);
+  assert.ok(robotPosition.y < afterPointerRelease.y - 10,
+    'Releasing touch Drive must not cancel a held keyboard Drive key');
+  listeners.get('keyup')({ code: 'ArrowUp', preventDefault() {} });
+  const afterKeyboardRelease = { ...robotPosition };
+  frames(5);
+  assert.deepEqual(robotPosition, afterKeyboardRelease,
+    'Releasing the final keyboard key must stop movement');
 });
 
 test('manual pickup can hand off to scripted AI and return to manual safely', () => {
