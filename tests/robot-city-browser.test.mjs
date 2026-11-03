@@ -137,7 +137,7 @@ test('real headless Chrome verifies Robot City mobile touch and desktop controls
     assert.deepEqual(skipLink, { focused: true, visibleTop: '8px', targetExists: true },
       'Keyboard skip navigation must be focusable, visible and target main content');
 
-    const startY = await evaluate('window.__robotPose.y');
+    // Keyboard users must be able to reach the canvas and see where focus is.\n    // Chrome focus styling is a regression guard, not a VoiceOver/Safari test.\n    const arenaFocus = await evaluate(`(() => {\n      const arena = document.getElementById('game');\n      arena.focus();\n      const result = {\n        focused: document.activeElement === arena,\n        outlineStyle: getComputedStyle(arena).outlineStyle,\n        outlineWidth: getComputedStyle(arena).outlineWidth\n      };\n      arena.blur();\n      return result;\n    })()`);\n    assert.equal(arenaFocus.focused, true, 'Robot City canvas must be keyboard focusable');\n    assert.equal(arenaFocus.outlineStyle, 'solid', 'Focused arena must show a visible outline');\n    assert.equal(arenaFocus.outlineWidth, '3px', 'Arena focus outline must remain at least 3px');\n\n    const startY = await evaluate('window.__robotPose.y');
     await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 11, pointerType: 'touch' }))`);
     await sleep(400);
     await evaluate(`document.getElementById('forward').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 11, pointerType: 'touch' }))`);
