@@ -41,3 +41,13 @@ for (const [name, events, expected] of fixtures) {
 test('no scoring after third delivery until restart', () => {
   assert.deepEqual(evaluate([['pickup',0],['delivery',0],['pickup',1],['delivery',1],['pickup',2],['delivery',2],'collision',['pickup',2],'restart',['pickup',0]]), [10,110,120,220,230,330,330,330,0,10]);
 });
+
+test('reject out-of-order mission indices', () => {
+  assert.deepEqual(evaluate([['pickup',1],['delivery',1],['pickup',0],['delivery',1],['delivery',0]]), [0,0,10,10,110]);
+});
+test('timeout blocks later events except restart', () => {
+  assert.deepEqual(evaluate(['timeout',['pickup',0],'collision','restart',['pickup',0]]), [0,0,0,0,10]);
+});
+test('restart after completion re-enables mission zero', () => {
+  assert.deepEqual(evaluate([['pickup',0],['delivery',0],['pickup',1],['delivery',1],['pickup',2],['delivery',2],'restart',['pickup',1],['pickup',0]]), [10,110,120,220,230,330,0,0,10]);
+});
