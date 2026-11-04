@@ -106,6 +106,75 @@ test('Skills to Services handoff announces preview-only limits to assistive tech
   assert.match(app, /function updateServicesContext\(\)\{const selected=mine\.find\(x=>x\.id===selectedRobotId\)/);
 });
 
+test('phone Services explains an unselected demo profile, keeps a 44px Skills handoff, and announces an unverified landing', () => {
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(skills && services, 'Expected Skills and Services sections');
+  assert.match(skills, /class="buy next-step" id="openServicesFromSkills" aria-describedby="skillsPreviewNotice servicePreviewNotice">Explore service previews →<\/button>/);
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*display:inline-flex;[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /#services \.next-step \{ width: 100%; \}/);
+  assert.match(services, /id="serviceRobotContext" class="academy-note" role="status" aria-live="polite"/);
+  assert.doesNotMatch(services, /id="serviceRobotContext"[^>]*aria-live="(?:off|assertive)"/);
+  assert.match(services, /No bookings, service requests or payments are available/);
+  assert.match(services, /id="openSkillsFromServices">Explore generic skill previews →/);
+  assert.match(services, /id="openRobotsFromServices">Manage demo robots →/);
+  assert.ok(services.indexOf('id="serviceRobotContext"') < services.indexOf('id="openSkillsFromServices"'));
+  assert.ok(services.indexOf('id="openRobotsFromServices"') < services.indexOf('id="servicecards"'));
+
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(show, /heading\.tabIndex=-1;heading\.focus\(\{preventScroll:true\}\)/);
+  assert.match(show, /services:'openSkillsFromServices'/);
+  assert.match(app, /byId\('openServicesFromSkills'\)\.onclick=\(\)=>show\('services'\)/);
+  assert.doesNotMatch(app, /byId\('openServicesFromSkills'\)\.hidden/);
+
+  const source = app.match(/function updateServicesContext\(\)\{[^\n]*\}/)?.[0];
+  assert.ok(source, 'Expected the Services demo-profile summary');
+  const node = () => ({
+    children: [], value: '', disabled: false, textContent: '',
+    replaceChildren(...items) { this.children = items; },
+    append(...items) { this.children.push(...items); },
+    focus() {}
+  });
+  const elements = { serviceRobotContext: node(), serviceRobotSelect: node() };
+  const context = {
+    mine: [], selectedRobotId: null, byId: id => elements[id],
+    document: { createElement: node, activeElement: null }
+  };
+  const update = new Script('(' + source + ')').runInNewContext(context);
+  const empty = 'These are generic service previews, not matched to any robot. Press Manage demo robots to add a local demo profile, or Explore generic skill previews to browse skills. Service eligibility and compatibility are unverified; no booking is available.';
+  update();
+  assert.equal(elements.serviceRobotContext.textContent, empty);
+  assert.equal(elements.serviceRobotSelect.disabled, true, 'No saved profiles leaves the Services picker unused');
+  assert.equal(elements.serviceRobotSelect.children[0].textContent, 'All generic service previews');
+  const home = { id: 'demo-1', name: 'Home helper', brand: 'Example Robotics', model: 'Model A' };
+  const garden = { id: 'demo-2', name: 'Garden Bot', brand: 'Example Maker', model: 'Model B' };
+  context.mine = [home, garden];
+  context.selectedRobotId = null;
+  update();
+  assert.equal(elements.serviceRobotContext.textContent, empty, 'Saved profiles with nothing selected stay on the generic empty state');
+  assert.equal(elements.serviceRobotSelect.disabled, false);
+  assert.equal(elements.serviceRobotSelect.value, '');
+  context.selectedRobotId = 'demo-2';
+  update();
+  assert.match(elements.serviceRobotContext.textContent, /Selected local demo profile: Garden Bot — Example Maker · Model B\./);
+  assert.match(elements.serviceRobotContext.textContent, /not matched to this robot/);
+  assert.match(elements.serviceRobotContext.textContent, /Service eligibility and compatibility are unverified; no booking is available/);
+  assert.match(elements.serviceRobotContext.textContent, /no installation is available/);
+  assert.equal(elements.serviceRobotSelect.value, 'demo-2');
+
+  const copy = [
+    services,
+    empty,
+    elements.serviceRobotContext.textContent,
+    'Illustrative setup guidance concept; no technician is assigned or appointment booked.',
+    'Illustrative routine care concept; no inspection, repair or booking is provided.'
+  ].join('\n');
+  assert.match(app, /no technician is assigned or appointment booked/);
+  assert.match(app, /no inspection, repair or booking is provided/);
+  assert.match(app, /aria-label="Add '\+x\.name\+' service preview to demo cart \(no booking\)"/);
+  assert.doesNotMatch(copy, /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now|technician dispatched|payment taken|robot is connected/i);
+});
+
 test('saved demo profile offers a contextual, accessible Skills handoff without new integrations', () => {
   const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
   assert.ok(robots, 'Expected My Robots');
