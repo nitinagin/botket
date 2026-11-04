@@ -1732,6 +1732,269 @@ test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and
   }
 });
 
+test('My Robots empty state and Skills handoff stay usable at 320, 390, and 430', { timeout: 90000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-robots-phone-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const url = 'http://127.0.0.1:' + server.address().port + '/consumer.html';
+    const forbidden = /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now/i;
+    const reveal = selector => evaluate(`(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const el = document.querySelector(${JSON.stringify(selector)});
+      const navTop = () => document.querySelector('.tabs').getBoundingClientRect().top;
+      if (!el || el.hidden || el.closest('[hidden]') || getComputedStyle(el).display === 'none') return null;
+      let steps = 0;
+      let rect = el.getBoundingClientRect();
+      while ((rect.bottom > navTop() - 1 || rect.top < -0.5) && steps < 8) {
+        const delta = rect.bottom > navTop() - 1
+          ? Math.max(1, Math.ceil(rect.bottom - (navTop() - 1)))
+          : Math.floor(rect.top);
+        window.scrollBy(0, delta);
+        rect = el.getBoundingClientRect();
+        steps += 1;
+      }
+      return {
+        name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        gap: navTop() - rect.bottom,
+        steps,
+        scrollY: window.scrollY
+      };
+    })()`);
+    const assertAbove = (control, label) => {
+      assert.ok(control, label + ' is missing');
+      assert.ok(control.width >= 44 && control.height >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+      assert.ok(control.top >= -0.5, label + ' starts above the viewport at ' + control.top.toFixed(1));
+      assert.ok(control.gap >= -0.5, label + ' overlaps the bottom nav by ' + (-control.gap).toFixed(1) + 'px');
+      assert.ok(control.steps < 8, label + ' was not clear of the bottom nav after ' + control.steps + ' scrolls');
+    };
+    const openRobots = async where => {
+      await evaluate("document.querySelector('[data-tab=robots]').click()");
+      await until(() => evaluate('document.querySelector("#robots").hidden === false && document.activeElement && document.activeElement.id === "robots-title"'), where + ' My Robots');
+    };
+    const skillsLanding = async (selector, where) => {
+      await evaluate(`(() => {
+        const control = document.querySelector(${JSON.stringify(selector)});
+        const navTop = document.querySelector('.tabs').getBoundingClientRect().top;
+        const rect = control.getBoundingClientRect();
+        if (rect.bottom > navTop - 1) window.scrollBy(0, Math.ceil(rect.bottom - (navTop - 1)));
+        control.click();
+      })()`);
+      await until(() => evaluate('document.querySelector("#skills").hidden === false && document.activeElement && document.activeElement.id === "skills-title"'), where + ' Skills focus');
+      const landed = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const summary = document.querySelector('#skillsRobotSummary');
+        const heading = document.querySelector('#skills h2');
+        return {
+          activeId: document.activeElement && document.activeElement.id,
+          sameHeading: document.activeElement === heading,
+          focusVisible: document.activeElement.matches(':focus-visible'),
+          aria: document.querySelector('[aria-current="page"]')?.dataset.tab,
+          summary: text(summary.textContent),
+          role: summary.getAttribute('role'),
+          live: summary.getAttribute('aria-live'),
+          headingTop: heading.getBoundingClientRect().top,
+          profiles: document.querySelectorAll('#myrobots article').length
+        };
+      })()`);
+      const ax = await send('Accessibility.getFullAXTree');
+      const nodes = new Map(ax.nodes.map(node => [node.nodeId, node]));
+      const announcement = ax.nodes.find(node => (node.name?.value || '').includes(landed.summary.slice(0, 48)));
+      let polite = announcement;
+      for (let depth = 0; polite && polite.role?.value !== 'status' && depth < 6; depth += 1) polite = nodes.get(polite.parentId);
+      return { landed, polite: polite ? {
+        role: polite.role?.value,
+        live: polite.properties?.find(property => property.name === 'live')?.value?.value
+      } : null };
+    };
+    const assertSkillsLanding = (result, where, expected) => {
+      const { landed } = result;
+      assert.equal(landed.activeId, 'skills-title', where + ' focused ' + landed.activeId);
+      assert.equal(landed.sameHeading, true, where + ' focus missed the Skills heading');
+      assert.equal(landed.focusVisible, false, where + ' shows a focus ring after the pointer handoff');
+      assert.equal(landed.aria, 'skills', where + ' aria-current');
+      assert.ok(landed.headingTop >= -0.5 && landed.headingTop < 2, where + ' Skills heading landed at ' + landed.headingTop.toFixed(1));
+      assert.equal(landed.role, 'status', where + ' Skills summary role');
+      assert.equal(landed.live, null, where + ' status role should keep its implicit polite live setting');
+      assert.match(landed.summary, expected);
+      assert.match(landed.summary, /Compatibility has not been checked; installation is unavailable/);
+      assert.doesNotMatch(landed.summary, /ownership verified|device connected|compatible with your robot|hardware connection confirmed/i);
+      assert.doesNotMatch(landed.summary, forbidden, where + ' Skills announcement implies a real purchase, connection, or verified compatibility');
+      assert.equal(result.polite?.role, 'status', where + ' announcement is not in a status region');
+      assert.equal(result.polite?.live, 'polite', where + ' announcement is not polite');
+    };
+
+    for (const [width, height] of [[320, 640], [390, 844], [430, 932]]) {
+      const where = width + 'x' + height;
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await send('Page.navigate', { url: url + '?w=' + width });
+      await until(() => evaluate('document.querySelector("#products [data-add]") !== null'), where + ' Discover');
+      await evaluate('localStorage.clear(); window.__botketRobotsReload = true');
+      await send('Page.reload', { ignoreCache: true });
+      await until(() => evaluate('window.__botketRobotsReload !== true && window.innerWidth === ' + width + ' && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), where + ' fresh demo');
+
+      await openRobots(where + ' empty');
+      const empty = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const piece = selector => {
+          const el = document.querySelector(selector);
+          if (!el || el.hidden || el.closest('[hidden]') || getComputedStyle(el).display === 'none') return null;
+          const rect = el.getBoundingClientRect();
+          return {
+            name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            gap: nav.top - rect.bottom,
+            steps: 0
+          };
+        };
+        return {
+          overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+          intro: text(document.querySelector('#robots > p.muted').textContent),
+          message: text(document.querySelector('#myrobots > p').textContent),
+          help: text(document.querySelector('#myrobots > p.hint').textContent),
+          discoverCount: document.querySelectorAll('#openDiscoverFromRobots:not([hidden])').length,
+          discover: piece('#openDiscoverFromRobots'),
+          skills: piece('#openSkillsFromRobots'),
+          form: text(document.querySelector('#registerRobot h3').textContent),
+          profiles: document.querySelectorAll('#myrobots article').length
+        };
+      })()`);
+      assert.equal(empty.overflow, 0, where + ' empty My Robots overflows by ' + empty.overflow + 'px');
+      assert.match(empty.intro, /does not verify ownership or connect hardware/);
+      assert.equal(empty.message, 'No demo robots added yet.');
+      assert.match(empty.help, /None of these actions verifies ownership, compatibility, or connects a device/);
+      assert.equal(empty.discoverCount, 1, where + ' empty My Robots should offer one route back to Discover');
+      assert.equal(empty.discover.name, 'Explore robot concepts →');
+      assert.equal(empty.skills.name, 'Explore skill previews →');
+      assert.equal(empty.form, 'Add a demo robot profile');
+      assert.equal(empty.profiles, 0, where + ' empty My Robots already has a saved profile');
+      assertAbove(empty.discover, where + ' empty Discover return');
+      assertAbove(empty.skills, where + ' empty Skills handoff');
+      const emptyMessage = await reveal('#myrobots > p');
+      assert.equal(emptyMessage.name, 'No demo robots added yet.');
+      assert.ok(emptyMessage.top >= -0.5 && emptyMessage.gap >= -0.5, where + ' empty explanation stays under the bottom nav (gap ' + emptyMessage.gap.toFixed(1) + 'px)');
+      assert.ok(emptyMessage.steps < 8, where + ' empty explanation was not reachable in ' + emptyMessage.steps + ' scrolls');
+
+      await openRobots(where + ' empty return');
+      const emptyLanding = await skillsLanding('#openSkillsFromRobots', where + ' empty handoff');
+      assertSkillsLanding(emptyLanding, where + ' empty handoff', /No demo robot profiles saved/);
+      assert.equal(emptyLanding.landed.profiles, 0, where + ' empty Skills handoff created a demo profile');
+      assert.doesNotMatch(emptyLanding.landed.summary, /Viewing generic skill previews for local demo profile/);
+
+      await openRobots(where + ' after empty handoff');
+      const discover = await reveal('#openDiscoverFromRobots');
+      assertAbove(discover, where + ' Discover return after the empty explanation');
+      await evaluate("document.querySelector('#openDiscoverFromRobots').click()");
+      await until(() => evaluate('document.querySelector("#store").hidden === false && document.querySelector("#robots").hidden === true && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), where + ' back to Discover');
+
+      await openRobots(where + ' save first');
+      await evaluate(`(() => {
+        document.querySelector('#robotNickname').value = 'Home helper';
+        document.querySelector('#robotBrand').value = 'Example Robotics';
+        document.querySelector('#robotModel').value = 'Model A';
+        document.querySelector('#registerRobot').requestSubmit();
+      })()`);
+      await until(() => evaluate('document.querySelectorAll("#myrobots article").length === 1'), where + ' first demo profile');
+      await evaluate("document.querySelector('[data-tab=store]').click()");
+      await until(() => evaluate('document.querySelector("#store").hidden === false'), where + ' leave My Robots');
+      await openRobots(where + ' one profile');
+      const one = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        return {
+          discoverHidden: document.querySelector('#openDiscoverFromRobots').hidden,
+          profiles: document.querySelectorAll('#myrobots article').length,
+          selected: text(document.querySelector('#myrobots h3').textContent),
+          message: text(document.querySelector('#robotMessage').textContent)
+        };
+      })()`);
+      assert.equal(one.discoverHidden, true, where + ' a saved profile still shows the empty Discover route');
+      assert.equal(one.profiles, 1, where + ' saved profile count');
+      assert.equal(one.selected, 'Home helper');
+      assert.match(one.message, /Demo profile saved locally/);
+      assert.match(one.message, /Compatibility not verified; no device connected/);
+      const oneSkills = await reveal('#openSkillsFromRobots');
+      assert.equal(oneSkills.name, 'Explore skill previews →');
+      assertAbove(oneSkills, where + ' one-profile Skills handoff');
+      const oneContinue = await reveal('#continueSavedProfileToSkills');
+      assert.equal(oneContinue.name, 'Continue to Skills with selected demo profile →');
+      assertAbove(oneContinue, where + ' one-profile Continue to Skills');
+      const oneLanding = await skillsLanding('#openSkillsFromRobots', where + ' one-profile handoff');
+      assertSkillsLanding(oneLanding, where + ' one-profile handoff', /Viewing generic skill previews for local demo profile: Home helper — Example Robotics · Model A/);
+      assert.match(oneLanding.landed.summary, /no booking or eligibility verification occurs/);
+      assert.equal(oneLanding.landed.profiles, 1, where + ' Skills handoff changed the saved profile');
+
+      await openRobots(where + ' continue handoff');
+      const continueLanding = await skillsLanding('#continueSavedProfileToSkills', where + ' Continue to Skills');
+      assertSkillsLanding(continueLanding, where + ' Continue to Skills', /Viewing generic skill previews for local demo profile: Home helper — Example Robotics · Model A/);
+
+      await openRobots(where + ' save second');
+      await evaluate(`(() => {
+        document.querySelector('#robotNickname').value = 'Garden Bot';
+        document.querySelector('#robotBrand').value = 'Example Maker';
+        document.querySelector('#robotModel').value = 'Model B';
+        document.querySelector('#registerRobot').requestSubmit();
+      })()`);
+      await until(() => evaluate('document.querySelectorAll("#myrobots article").length === 2'), where + ' second demo profile');
+      await evaluate("document.querySelector('[data-tab=store]').click()");
+      await openRobots(where + ' two profiles');
+      const twoSkills = await reveal('#openSkillsFromRobots');
+      assert.equal(twoSkills.name, 'Explore skill previews →');
+      assertAbove(twoSkills, where + ' two-profile Skills handoff');
+      const twoLanding = await skillsLanding('#openSkillsFromRobots', where + ' two-profile handoff');
+      assertSkillsLanding(twoLanding, where + ' two-profile handoff', /Viewing generic skill previews for local demo profile: Garden Bot — Example Maker · Model B/);
+      assert.equal(twoLanding.landed.profiles, 2, where + ' second profile was not kept');
+      const stored = await evaluate("localStorage.getItem('botket-demo-robots-v1')");
+      assert.match(stored, /Home helper/);
+      assert.match(stored, /Garden Bot/);
+      assert.doesNotMatch(await evaluate('document.querySelector("#robots").innerText + document.querySelector("#skills").innerText'), forbidden, where + ' My Robots or Skills implies a real purchase, connection, or verified compatibility');
+    }
+  } finally {
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
+  }
+});
+
 test('320px section handoffs start at the heading and keep the next demo action above the bottom nav', { timeout: 60000 }, async () => {
   const root = process.cwd();
   const assets = {
