@@ -42,6 +42,9 @@ test('750ms candidate accepts collisions at 0 and 800ms', () => {
 test('exact cooldown boundary is accepted', () => {
   assert.deepEqual(collisionScores([0, 499, 500].map(elapsedMs => ({ type: 'collision', elapsedMs })), { cooldownMs: 500 }), [25, 25, 20]);
 });
+test('750ms cooldown boundary rejects 749ms and accepts 750ms', () => {
+  assert.deepEqual(collisionScores([0, 749, 750].map(elapsedMs => ({ type: 'collision', elapsedMs })), { cooldownMs: 750 }), [25, 25, 20]);
+});
 test('restart clears cooldown state', () => {
   assert.deepEqual(collisionScores([{type:'collision',elapsedMs:0},{type:'restart'},{type:'collision',elapsedMs:0}], {cooldownMs:750}), [25,30,25]);
 });
