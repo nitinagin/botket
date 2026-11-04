@@ -1392,6 +1392,243 @@ test('empty Checkout, My Robots, Skills, and Services stay inside 320, 390, and 
   }
 });
 
+test('Skills to Services handoff and Services empty state stay usable at 320, 390, and 430', { timeout: 90000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-services-phone-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    await send('Accessibility.enable');
+    const url = 'http://127.0.0.1:' + server.address().port + '/consumer.html';
+    const forbidden = /buy now|place order|payment method|card number|connect your robot|verified compatible|compatibility is verified|book a service|install now|technician dispatched|payment taken|robot is connected/i;
+    const emptyCopy = 'These are generic service previews, not matched to any robot. Press Manage demo robots to add a local demo profile, or Explore generic skill previews to browse skills. Service eligibility and compatibility are unverified; no booking is available.';
+    const inspect = selectors => evaluate(`(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const navTop = () => document.querySelector('.tabs').getBoundingClientRect().top;
+      const saved = window.scrollY;
+      const piece = selector => {
+        window.scrollTo(0, saved);
+        const el = document.querySelector(selector);
+        if (!el || el.hidden || el.closest('[hidden]') || getComputedStyle(el).display === 'none') return null;
+        const first = el.getBoundingClientRect();
+        const firstNav = navTop();
+        let steps = 0;
+        if (first.bottom > firstNav - 1 || first.top < -0.5) {
+          const delta = first.bottom > firstNav - 1 ? Math.ceil(first.bottom - (firstNav - 1)) : Math.floor(first.top);
+          window.scrollBy(0, delta);
+          steps = 1;
+        }
+        const rect = el.getBoundingClientRect();
+        const result = {
+          name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          gap: navTop() - rect.bottom,
+          steps
+        };
+        window.scrollTo(0, saved);
+        return result;
+      };
+      const selectors = ${JSON.stringify(selectors)};
+      const pieces = {};
+      for (const selector of selectors) pieces[selector] = piece(selector);
+      window.scrollTo(0, saved);
+      return pieces;
+    })()`);
+    const assertInReach = (control, label, tap) => {
+      assert.ok(control, label + ' is missing');
+      assert.equal(control.steps, 0, label + ' needs ' + control.steps + ' scroll(s); it should be above the bottom nav on arrival');
+      assert.ok(control.top >= -0.5, label + ' starts above the viewport at ' + control.top.toFixed(1));
+      assert.ok(control.gap >= -0.5, label + ' overlaps the bottom nav by ' + (-control.gap).toFixed(1) + 'px');
+      if (tap) assert.ok(control.width >= 44 && control.height >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+    };
+    const openSkills = async where => {
+      await evaluate("document.querySelector('[data-tab=skills]').click()");
+      await until(() => evaluate('document.querySelector("#skills").hidden === false && document.activeElement && document.activeElement.id === "skills-title"'), where + ' Skills');
+    };
+    const servicesLanding = async where => {
+      await evaluate(`(() => {
+        const control = document.querySelector('#openServicesFromSkills');
+        const navTop = document.querySelector('.tabs').getBoundingClientRect().top;
+        const rect = control.getBoundingClientRect();
+        if (rect.bottom > navTop - 1 || rect.top < -0.5) {
+          const delta = rect.bottom > navTop - 1 ? Math.ceil(rect.bottom - (navTop - 1)) : Math.floor(rect.top);
+          window.scrollBy(0, delta);
+        }
+        control.click();
+      })()`);
+      await until(() => evaluate('document.querySelector("#services").hidden === false && document.activeElement && document.activeElement.id === "services-title"'), where + ' Services focus');
+      const landed = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const summary = document.querySelector('#serviceRobotContext');
+        const heading = document.querySelector('#services h2');
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const headingBox = heading.getBoundingClientRect();
+        return {
+          activeId: document.activeElement && document.activeElement.id,
+          sameHeading: document.activeElement === heading,
+          focusVisible: document.activeElement.matches(':focus-visible'),
+          aria: document.querySelector('[aria-current="page"]')?.dataset.tab,
+          summary: text(summary.textContent),
+          role: summary.getAttribute('role'),
+          live: summary.getAttribute('aria-live'),
+          headingTop: headingBox.top,
+          headingBottom: headingBox.bottom,
+          navTop: nav.top,
+          overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+          profiles: document.querySelectorAll('#myrobots article').length,
+          cards: [...document.querySelectorAll('#servicecards article')].map(card => text(card.innerText)),
+          notice: text(document.querySelector('#services > p.muted').textContent)
+        };
+      })()`);
+      const ax = await send('Accessibility.getFullAXTree');
+      const nodes = new Map(ax.nodes.map(node => [node.nodeId, node]));
+      const announcement = ax.nodes.find(node => (node.name?.value || '').includes(landed.summary.slice(0, 48)));
+      let polite = announcement;
+      for (let depth = 0; polite && polite.role?.value !== 'status' && depth < 6; depth += 1) polite = nodes.get(polite.parentId);
+      return { landed, polite: polite ? {
+        role: polite.role?.value,
+        live: polite.properties?.find(property => property.name === 'live')?.value?.value
+      } : null };
+    };
+    const assertServicesLanding = (result, where, expected) => {
+      const { landed } = result;
+      assert.equal(landed.overflow, 0, where + ' overflows horizontally by ' + landed.overflow + 'px');
+      assert.equal(landed.activeId, 'services-title', where + ' focused ' + landed.activeId);
+      assert.equal(landed.sameHeading, true, where + ' focus missed the Services heading');
+      assert.equal(landed.focusVisible, false, where + ' shows a focus ring after the pointer handoff');
+      assert.equal(landed.aria, 'services', where + ' aria-current');
+      assert.ok(landed.headingTop >= -0.5 && landed.headingBottom <= landed.navTop, where + ' Services heading is not fully above the bottom nav');
+      assert.equal(landed.role, 'status', where + ' Services summary role');
+      assert.equal(landed.live, 'polite', where + ' Services summary live setting');
+      assert.match(landed.summary, expected);
+      assert.match(landed.summary, /no booking is available/i);
+      assert.match(landed.summary, /eligibility and compatibility are unverified/i);
+      assert.match(landed.notice, /No bookings, service requests or payments are available/);
+      assert.doesNotMatch(landed.summary, /booking confirmed|payment taken|technician dispatched|robot is connected|compatibility is verified/i);
+      assert.doesNotMatch([landed.summary, landed.notice, ...landed.cards].join(' '), forbidden, where + ' Services copy implies a real booking, payment, dispatch, connection, or verified compatibility');
+      assert.equal(result.polite?.role, 'status', where + ' announcement is not in a status region');
+      assert.equal(result.polite?.live, 'polite', where + ' announcement is not polite');
+      assert.equal(landed.cards.length, 2, where + ' Services catalog');
+      assert.match(landed.cards[0], /no technician is assigned or appointment booked/);
+      assert.match(landed.cards[1], /no inspection, repair or booking is provided/);
+    };
+    const saveProfile = async (name, brand, model, count, where) => {
+      await evaluate(`(() => {
+        document.querySelector('[data-tab=robots]').click();
+        document.querySelector('#robotNickname').value = ${JSON.stringify(name)};
+        document.querySelector('#robotBrand').value = ${JSON.stringify(brand)};
+        document.querySelector('#robotModel').value = ${JSON.stringify(model)};
+        document.querySelector('#registerRobot').requestSubmit();
+      })()`);
+      await until(() => evaluate('document.querySelectorAll("#myrobots article").length === ' + count), where);
+    };
+
+    for (const [width, height] of [[320, 640], [390, 844], [430, 932]]) {
+      const where = width + 'x' + height;
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await send('Page.navigate', { url: url + '?w=' + width });
+      await until(() => evaluate('document.querySelector("#products [data-add]") !== null'), where + ' Discover');
+      await evaluate('localStorage.clear()');
+      await send('Page.reload', { ignoreCache: true });
+      await until(() => evaluate('window.innerWidth === ' + width + ' && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), where + ' fresh demo');
+
+      await openSkills(where + ' empty');
+      const emptyHandoff = await inspect(['#openServicesFromSkills']);
+      assert.equal(emptyHandoff['#openServicesFromSkills'].name, 'Explore service previews →');
+      assertInReach(emptyHandoff['#openServicesFromSkills'], where + ' empty Skills to Services handoff', true);
+      const emptyLanding = await servicesLanding(where + ' empty handoff');
+      assertServicesLanding(emptyLanding, where + ' empty handoff', new RegExp(emptyCopy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.equal(emptyLanding.landed.profiles, 0, where + ' empty Services handoff created a demo profile');
+      assert.equal(emptyLanding.landed.summary, emptyCopy);
+      const emptyScreen = await inspect(['#services > p.muted', '#serviceRobotContext', '#openSkillsFromServices', '#openRobotsFromServices']);
+      assert.match(emptyScreen['#services > p.muted'].name, /No bookings, service requests or payments are available/);
+      assert.equal(emptyScreen['#serviceRobotContext'].name, emptyCopy);
+      assert.equal(emptyScreen['#openSkillsFromServices'].name, 'Explore generic skill previews →');
+      assert.equal(emptyScreen['#openRobotsFromServices'].name, 'Manage demo robots →');
+      assertInReach(emptyScreen['#services > p.muted'], where + ' empty Services notice', false);
+      assertInReach(emptyScreen['#serviceRobotContext'], where + ' empty Services status', false);
+      assertInReach(emptyScreen['#openSkillsFromServices'], where + ' empty Services skills return', true);
+      assertInReach(emptyScreen['#openRobotsFromServices'], where + ' empty Services robots return', true);
+
+      await saveProfile('Home helper', 'Example Robotics', 'Model A', 1, where + ' first demo profile');
+      await openSkills(where + ' one profile');
+      const oneHandoff = await inspect(['#openServicesFromSkills']);
+      assert.equal(oneHandoff['#openServicesFromSkills'].name, 'Explore service previews →');
+      assertInReach(oneHandoff['#openServicesFromSkills'], where + ' one-profile Skills to Services handoff', true);
+      const oneLanding = await servicesLanding(where + ' one-profile handoff');
+      assertServicesLanding(oneLanding, where + ' one-profile handoff', /Selected local demo profile: Home helper — Example Robotics · Model A\./);
+      assert.match(oneLanding.landed.summary, /not matched to this robot/);
+      assert.equal(oneLanding.landed.profiles, 1, where + ' Services handoff changed the saved profile');
+      const oneScreen = await inspect(['#serviceRobotContext', '#openRobotsFromServices']);
+      assertInReach(oneScreen['#serviceRobotContext'], where + ' one-profile Services status', false);
+      assertInReach(oneScreen['#openRobotsFromServices'], where + ' one-profile Services robots return', true);
+
+      await saveProfile('Garden Bot', 'Example Maker', 'Model B', 2, where + ' second demo profile');
+      await openSkills(where + ' two profiles');
+      const twoHandoff = await inspect(['#openServicesFromSkills']);
+      assertInReach(twoHandoff['#openServicesFromSkills'], where + ' two-profile Skills to Services handoff', true);
+      const twoLanding = await servicesLanding(where + ' two-profile handoff');
+      assertServicesLanding(twoLanding, where + ' two-profile handoff', /Selected local demo profile: Garden Bot — Example Maker · Model B\./);
+      assert.equal(twoLanding.landed.profiles, 2, where + ' second profile was not kept');
+      const twoScreen = await inspect(['#openSkillsFromServices', '#openRobotsFromServices']);
+      assertInReach(twoScreen['#openSkillsFromServices'], where + ' two-profile Services skills return', true);
+      assertInReach(twoScreen['#openRobotsFromServices'], where + ' two-profile Services robots return', true);
+
+      await evaluate("document.querySelector('#serviceRobotSelect').value=''; document.querySelector('#serviceRobotSelect').dispatchEvent(new Event('change'))");
+      await until(() => evaluate('document.querySelector("#serviceRobotContext").textContent.includes("not matched to any robot") && document.querySelectorAll("#myrobots article").length === 2'), where + ' cleared Services selection');
+      const cleared = await inspect(['#serviceRobotContext']);
+      assert.equal(cleared['#serviceRobotContext'].name, emptyCopy, where + ' nothing selected should restore the generic Services explanation');
+      assertInReach(cleared['#serviceRobotContext'], where + ' cleared Services status', false);
+      await openSkills(where + ' cleared selection');
+      const clearedLanding = await servicesLanding(where + ' cleared handoff');
+      assertServicesLanding(clearedLanding, where + ' cleared handoff', new RegExp(emptyCopy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.equal(clearedLanding.landed.profiles, 2, where + ' clearing the Services selection deleted a demo profile');
+      const stored = await evaluate("localStorage.getItem('botket-demo-robots-v1')");
+      assert.match(stored, /Home helper/);
+      assert.match(stored, /Garden Bot/);
+    }
+  } finally {
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
+  }
+});
+
 test('filled Checkout, My Robots, Skills, and Services stay inside 320, 390, and 430 phone widths', { timeout: 90000 }, async () => {
   const root = process.cwd();
   const assets = {
