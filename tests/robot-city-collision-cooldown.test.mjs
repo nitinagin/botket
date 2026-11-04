@@ -56,3 +56,12 @@ test('invalid and decreasing timestamps are rejected', () => {
 test('rejected collision timestamps must still be monotonic', () => {
   assert.throws(() => collisionScores([0, 200, 150].map(elapsedMs => ({type:'collision',elapsedMs})), {cooldownMs:500}), RangeError);
 });
+
+test('same-timestamp duplicate collisions do not bypass cooldown', () => {
+  assert.deepEqual(collisionScores([0, 0, 500].map(elapsedMs => ({ type: 'collision', elapsedMs })), { cooldownMs: 500 }), [25, 25, 20]);
+});
+test('non-finite, fractional, and unsafe timestamps are rejected', () => {
+  for (const elapsedMs of [NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, null]) {
+    assert.throws(() => collisionScores([{ type: 'collision', elapsedMs }], { cooldownMs: 500 }), RangeError);
+  }
+});
