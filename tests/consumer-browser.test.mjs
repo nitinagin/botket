@@ -1012,7 +1012,7 @@ test('mobile section handoffs open at the heading for pointer and keyboard users
   }
 });
 
-test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 60000 }, async () => {
+test('Discover concept cards stay inside 320, 390, and 430 phone widths', { timeout: 60000 }, async () => {
   const root = process.cwd();
   const assets = {
     '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
@@ -1055,6 +1055,7 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
     await send('Runtime.enable');
     const measure = `(() => {
       const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const navTop = document.querySelector('.tabs').getBoundingClientRect().top;
       const cards = [...document.querySelectorAll('#products .concept-card')].map(card => {
         const cardRect = card.getBoundingClientRect();
         const heading = card.querySelector('h3');
@@ -1077,6 +1078,7 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
             left: rect.left,
             right: rect.right,
             scrollGap: el.scrollWidth - el.clientWidth,
+            gap: navTop - rect.bottom,
             lines
           };
         });
@@ -1133,9 +1135,18 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
           }
           if (part.kind === 'button') {
             assert.ok(part.width >= 44 && part.height >= 44, piece + ' tap target is ' + part.width.toFixed(1) + 'x' + part.height.toFixed(1));
+            assert.equal(part.lines.length, 1, piece + ' wraps onto ' + part.lines.length + ' lines');
+          }
+          if (part.kind === 'price' || part.kind === 'badge') {
+            assert.equal(part.lines.length, 1, piece + ' wraps onto ' + part.lines.length + ' lines');
           }
         }
       });
+      const firstActions = measured.cards[0].parts.filter(part => part.kind === 'button');
+      assert.equal(firstActions.length, 2, label + ' first card actions');
+      for (const action of firstActions) {
+        assert.ok(action.gap >= 0, label + ' first card "' + action.text + '" is ' + (-action.gap).toFixed(1) + 'px under the bottom nav');
+      }
     };
     const show = async (width, height) => {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
@@ -1150,15 +1161,48 @@ test('Discover concept cards stay inside 320 and 390 phone widths', { timeout: 6
     const addToCart = names.map(() => 'Add to demo cart');
     assertCards(await show(320, 640), '320x640', addToCart);
     assertCards(await show(390, 844), '390x844', addToCart);
+    assertCards(await show(430, 932), '430x932', addToCart);
 
     await show(320, 640);
-    await evaluate("document.querySelector('#products [data-add]').click()");
+    const chips = await evaluate(`(() => {
+      const nav = document.querySelector('.tabs').getBoundingClientRect().top;
+      return [...document.querySelectorAll('#store .store-filters button')].map(el => {
+        const rect = el.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const lines = [...range.getClientRects()].filter(line => line.width > 0.5);
+        return {
+          text: el.textContent.trim(),
+          width: rect.width,
+          height: rect.height,
+          gap: nav - rect.bottom,
+          scrollGap: el.scrollWidth - el.clientWidth,
+          lineRight: lines.length ? Math.max(...lines.map(line => line.right)) : 0,
+          lineLeft: lines.length ? Math.min(...lines.map(line => line.left)) : 0,
+          right: rect.right,
+          left: rect.left,
+          lines: lines.length
+        };
+      });
+    })()`);
+    assert.deepEqual(chips.map(chip => chip.text), ['All robots', 'Home', 'Companion', 'Education']);
+    for (const chip of chips) {
+      assert.ok(chip.width >= 44 && chip.height >= 44, '320 category ' + chip.text + ' is ' + chip.width.toFixed(1) + 'x' + chip.height.toFixed(1));
+      assert.ok(chip.gap >= 0, '320 category ' + chip.text + ' is under the bottom nav');
+      assert.ok(chip.scrollGap <= 1, '320 category ' + chip.text + ' clips its label');
+      assert.equal(chip.lines, 1, '320 category ' + chip.text + ' wraps');
+      assert.ok(chip.lineLeft >= chip.left - 1 && chip.lineRight <= chip.right + 1, '320 category ' + chip.text + ' text leaves the chip');
+    }
+    await evaluate("document.querySelector('#products [data-add]').focus(); document.querySelector('#products [data-add]').click()");
     await until(() => evaluate("document.querySelector('#count').textContent === '1'"), 'demo cart has the first concept');
+    assert.equal(await evaluate("document.activeElement === document.querySelector('#cart h2')"), true, 'Discover to Checkout moves focus to the checkout heading');
+    assert.equal(await evaluate("document.querySelector('#cart h2').textContent"), 'Demo checkout');
     await evaluate("document.querySelector('[data-tab=store]').click()");
     await until(() => evaluate("document.querySelector('#store').hidden === false && document.querySelector('#products button[disabled]') !== null"), 'Discover shows the concept already in the demo cart');
     const inCart = ['In demo cart', 'Add to demo cart', 'Add to demo cart'];
     assertCards(await show(320, 640), '320x640 in demo cart', inCart);
     assertCards(await show(390, 844), '390x844 in demo cart', inCart);
+    assertCards(await show(430, 932), '430x932 in demo cart', inCart);
   } finally {
     await closeChromeAndCleanup(chrome, cdp, server, dir);
   }

@@ -3083,8 +3083,15 @@ test('narrow phone handoffs align the destination heading to the top of the view
   assert.match(show, /openSkillsFromRobots/);
   assert.doesNotMatch(show, /scrollIntoView|behavior:\s*['"]smooth['"]/);
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
-  assert.match(mobile, /At 320x640, with the section heading at the top, Create demo profile sat about 14px under the fixed bottom nav/);
-  assert.match(mobile, /@media \(max-width: 359px\) \{\s*#store > p\.muted \{ margin-bottom: 2px; \}\s*#store \.store-filters \{ margin-bottom: 2px; \}\s*#store > \.grid \{ margin-top: 0; \}\s*\.concept-card \{ gap: 4px; padding: 4px 12px 8px; \}\s*\}/);
+  assert.match(mobile, /At 320x640 the first concept card started below the screen, and Add to demo cart sat 257px under the fixed bottom nav\. The illustrative price also wrapped onto a second line\./);
+  assert.match(mobile, /At 390px each concept action was 158px wide, so "Create demo profile →" wrapped the arrow onto its own line\./);
+  assert.match(mobile, /\.concept-actions button \{ box-sizing: border-box; padding: 10px 6px; \}/);
+  assert.match(mobile, /body:has\(#store:not\(\[hidden\]\)\) header img \{ width: 72px; height: auto; \}/);
+  assert.match(mobile, /#store \.store-filters \{ margin: 2px 0; gap: 4px; flex-wrap: nowrap; \}/);
+  assert.match(mobile, /\.concept-card \.concept-price \{ font-size: 1rem; line-height: 1\.2; padding: 4px 8px; \}/);
+  assert.match(mobile, /\.concept-actions button \{ margin-top: 0; \}/);
+  assert.match(page, /header img\{display:block;width:150px;max-width:100%;height:auto\}/);
+  assert.match(page, /<header><img src="assets\/botket-logo\.svg" alt="BOTKET" \/>/);
   assert.match(page, /\.concept-actions button\{[^}]*min-height:44px/);
   assert.match(page, /\.next-step\{[^}]*min-height:44px;[^}]*min-width:44px/);
   assert.match(page, /#items > button\{[^}]*min-height:44px/);
