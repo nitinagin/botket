@@ -2579,3 +2579,231 @@ test('reduced motion keeps Discover, Checkout, My Robots, Skills, and Services j
     await closeChromeAndCleanup(chrome, cdp, server, dir);
   }
 });
+
+test('Checkout empty state and My Robots handoff stay usable at 320, 390, and 430', { timeout: 60000 }, async () => {
+  const root = process.cwd();
+  const assets = {
+    '/consumer.html': { file: join(root, 'consumer.html'), type: 'text/html; charset=utf-8' },
+    '/assets/botket-logo.svg': { file: join(root, 'assets/botket-logo.svg'), type: 'image/svg+xml' }
+  };
+  const server = createServer((request, response) => {
+    const asset = assets[request.url?.split('?')[0]];
+    if (!asset) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { 'content-type': asset.type });
+    response.end(readFileSync(asset.file));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(join(tmpdir(), 'botket-checkout-phone-'));
+  let chrome, cdp;
+  try {
+    chrome = spawn(browserBinary(), [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--remote-allow-origins=*', '--remote-debugging-port=0',
+      '--user-data-dir=' + dir, 'about:blank'
+    ], { stdio: 'ignore' });
+    const portFile = join(dir, 'DevToolsActivePort');
+    const port = await until(() => {
+      if (chrome.exitCode !== null) throw new Error('Chrome exited before debugging started.');
+      return existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]);
+    }, 'Chrome DevTools port', 20000);
+    const tab = await until(async () => {
+      const response = await fetch('http://127.0.0.1:' + port + '/json/list');
+      const pages = await response.json();
+      return pages.find(page => page.type === 'page' && page.webSocketDebuggerUrl);
+    }, 'Chrome tab');
+    cdp = await openCDP(tab.webSocketDebuggerUrl);
+    const send = cdp.send;
+    const evaluate = async expression => {
+      const response = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+      if (response.exceptionDetails) throw new Error('Browser JS exception: ' + response.exceptionDetails.text);
+      return response.result.value;
+    };
+    await send('Page.enable');
+    await send('Runtime.enable');
+    const url = 'http://127.0.0.1:' + server.address().port + '/consumer.html';
+    const box = selector => evaluate(`(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const el = document.querySelector(${JSON.stringify(selector)});
+      const nav = document.querySelector('.tabs').getBoundingClientRect();
+      if (!el || el.hidden || el.closest('[hidden]') || getComputedStyle(el).display === 'none') return null;
+      const rect = el.getBoundingClientRect();
+      return {
+        name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        gap: nav.top - rect.bottom,
+        navTop: nav.top,
+        scrollY: window.scrollY
+      };
+    })()`);
+    const reveal = selector => evaluate(`(() => {
+      const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+      const el = document.querySelector(${JSON.stringify(selector)});
+      const navTop = () => document.querySelector('.tabs').getBoundingClientRect().top;
+      if (!el || el.hidden || el.closest('[hidden]')) return null;
+      let steps = 0;
+      let rect = el.getBoundingClientRect();
+      while (rect.bottom > navTop() - 1 && steps < 8) {
+        window.scrollBy(0, Math.max(1, Math.ceil(rect.bottom - (navTop() - 1))));
+        rect = el.getBoundingClientRect();
+        steps += 1;
+      }
+      return {
+        name: text(el.getAttribute('aria-label') || el.innerText || el.textContent),
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        gap: navTop() - rect.bottom,
+        steps,
+        scrollY: window.scrollY
+      };
+    })()`);
+    const assertAbove = (control, label) => {
+      assert.ok(control, label + ' is missing');
+      assert.ok(control.width >= 44 && control.height >= 44, label + ' tap target is ' + control.width.toFixed(1) + 'x' + control.height.toFixed(1));
+      assert.ok(control.top >= -0.5, label + ' starts above the viewport at ' + control.top.toFixed(1));
+      assert.ok(control.gap >= -0.5, label + ' overlaps the bottom nav by ' + (-control.gap).toFixed(1) + 'px');
+    };
+
+    for (const [width, height] of [[320, 640], [390, 844], [430, 932]]) {
+      const where = width + 'x' + height;
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      await send('Page.navigate', { url: url + '?w=' + width });
+      await until(() => evaluate('document.querySelector("#products [data-add]") !== null'), where + ' Discover');
+      await evaluate('localStorage.clear(); window.__botketCheckoutReload = true');
+      await send('Page.reload', { ignoreCache: true });
+      await until(() => evaluate('window.__botketCheckoutReload !== true && window.innerWidth === ' + width + ' && document.querySelector("#count").textContent === "0" && document.querySelector("#profileCount").textContent.startsWith("0 of 30")'), where + ' fresh demo');
+
+      await evaluate("document.querySelector('[data-tab=cart]').click()");
+      await until(() => evaluate('document.querySelector("#cart").hidden === false && document.activeElement && document.activeElement.id === "cart-title"'), where + ' empty Checkout');
+      const empty = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const message = document.querySelector('#items > p');
+        const browse = document.querySelector('#items [data-cart-browse]');
+        const rect = message.getBoundingClientRect();
+        const browseRect = browse.getBoundingClientRect();
+        return {
+          overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth,
+          summary: text(document.querySelector('#cartSummary').textContent),
+          message: text(message.textContent),
+          messageTop: rect.top,
+          messageGap: nav.top - rect.bottom,
+          browseCount: document.querySelectorAll('#items [data-cart-browse]').length,
+          browseName: text(browse.textContent),
+          browseTop: browseRect.top,
+          browseGap: nav.top - browseRect.bottom,
+          browseWidth: browseRect.width,
+          browseHeight: browseRect.height,
+          cardFields: document.querySelectorAll('#cart input[autocomplete*="cc"], #cart input[name*="card"], #cart input[placeholder*="Card"]').length
+        };
+      })()`);
+      assert.equal(empty.overflow, 0, where + ' empty Checkout overflows by ' + empty.overflow + 'px');
+      assert.equal(empty.summary, 'Demo cart is empty. No order placed.');
+      assert.equal(empty.message, 'Your cart is empty. No order was placed. Press Open My Robots (demo profiles). This does not connect a device.');
+      assert.ok(empty.messageTop >= -0.5 && empty.messageGap >= -0.5, where + ' empty explanation is clipped by the bottom nav (gap ' + empty.messageGap.toFixed(1) + 'px)');
+      assert.equal(empty.browseCount, 1, where + ' empty Checkout should offer one catalog return');
+      assert.equal(empty.browseName, 'Browse demo robots →');
+      assertAbove({ top: empty.browseTop, gap: empty.browseGap, width: empty.browseWidth, height: empty.browseHeight }, where + ' Discover return');
+      assert.equal(empty.cardFields, 0, where + ' empty Checkout shows a card field');
+      await evaluate("document.querySelector('#items [data-cart-browse]').click()");
+      await until(() => evaluate('document.querySelector("#store").hidden === false && document.querySelector("#cart").hidden === true && document.querySelector("#count").textContent === "0"'), where + ' return to Discover');
+
+      await evaluate("document.querySelector('#products [data-add]').click()");
+      await until(() => evaluate('document.querySelector("#cart").hidden === false && document.querySelector("#count").textContent === "1"'), where + ' one concept');
+      assert.match(await evaluate("document.querySelector('#cartSummary').textContent"), /Illustrative prices only; no order placed/);
+      assert.match(await evaluate("document.querySelector('#items').textContent"), /\(demo only\)/);
+      const oneHandoff = await (async () => {
+        await reveal('#preview');
+        await evaluate("document.querySelector('#preview').click()");
+        await until(() => evaluate('document.querySelector("#checkoutToRobots").hidden === false'), where + ' one-item handoff');
+        return reveal('#checkoutToRobots');
+      })();
+      assert.equal(oneHandoff.name, 'Continue to My Robots (demo) →');
+      assertAbove(oneHandoff, where + ' one-item My Robots handoff');
+      assert.ok(oneHandoff.steps < 8, where + ' one-item handoff could not be scrolled clear in ' + oneHandoff.steps + ' steps');
+
+      await evaluate("document.querySelector('#browseFromCheckout').click()");
+      await until(() => evaluate('document.querySelector("#store").hidden === false && document.querySelector("#products [data-add]:not([disabled])") !== null'), where + ' Discover for a second concept');
+      await evaluate("document.querySelector('#products [data-add]:not([disabled])').click()");
+      await until(() => evaluate('document.querySelector("#count").textContent === "2" && document.querySelectorAll("#items [data-cart-remove]").length === 2'), where + ' two concepts');
+      await reveal('#preview');
+      await evaluate("document.querySelector('#preview').click()");
+      await until(() => evaluate('document.querySelector("#checkoutToRobots").hidden === false && document.querySelector("#checkoutToRobots").textContent.includes("My Robots")'), where + ' two-item handoff');
+      const twoHandoff = await reveal('#checkoutToRobots');
+      assert.equal(twoHandoff.name, 'Continue to My Robots (demo) →');
+      assertAbove(twoHandoff, where + ' two-item My Robots handoff');
+
+      await evaluate("document.querySelector('#checkoutToRobots').click()");
+      await until(() => evaluate('document.querySelector("#robots").hidden === false'), where + ' My Robots');
+      const landed = await evaluate(`(() => {
+        const text = value => (value || '').replace(/\\s+/g, ' ').trim();
+        const nav = document.querySelector('.tabs').getBoundingClientRect();
+        const active = document.activeElement;
+        const heading = document.querySelector('#robots h2');
+        const form = document.querySelector('#registerRobot h3');
+        const nickname = document.querySelector('#robotNickname');
+        const message = document.querySelector('#robotMessage');
+        const formRect = form.getBoundingClientRect();
+        const nickRect = nickname.getBoundingClientRect();
+        return {
+          activeId: active && active.id,
+          sameHeading: active === heading,
+          focusVisible: active.matches(':focus-visible'),
+          aria: document.querySelector('[aria-current="page"]')?.dataset.tab,
+          message: text(message.textContent),
+          role: message.getAttribute('role'),
+          live: message.getAttribute('aria-live'),
+          profiles: document.querySelectorAll('#myrobots article').length,
+          formName: text(form.textContent),
+          formTop: formRect.top,
+          formGap: nav.top - formRect.bottom,
+          nickTop: nickRect.top,
+          nickGap: nav.top - nickRect.bottom,
+          nickWidth: nickRect.width,
+          nickHeight: nickRect.height
+        };
+      })()`);
+      assert.equal(landed.activeId, 'robots-title', where + ' focused ' + landed.activeId);
+      assert.equal(landed.sameHeading, true, where + ' focus missed the My Robots heading');
+      assert.equal(landed.focusVisible, false, where + ' shows a focus ring after the pointer handoff');
+      assert.equal(landed.aria, 'robots', where + ' aria-current');
+      assert.equal(landed.role, 'status', where + ' announcement role');
+      assert.equal(landed.live, null, where + ' status role should keep its implicit polite live setting');
+      assert.match(landed.message, /Checkout was a demo preview for 2 robot concepts/);
+      assert.match(landed.message, /does not confirm purchase, ownership, compatibility or hardware connection/);
+      assert.equal(landed.profiles, 0, where + ' checkout created a demo profile');
+      assert.equal(landed.formName, 'Add a demo robot profile');
+      assert.ok(landed.formTop >= -0.5 && landed.formGap >= -0.5, where + ' new demo profile form is below the bottom nav by ' + (-landed.formGap).toFixed(1) + 'px');
+      assertAbove({ top: landed.nickTop, gap: landed.nickGap, width: landed.nickWidth, height: landed.nickHeight }, where + ' new demo profile nickname');
+      const ax = await send('Accessibility.getFullAXTree');
+      const nodes = new Map(ax.nodes.map(node => [node.nodeId, node]));
+      const announcement = ax.nodes.find(node => (node.name?.value || '').includes('Checkout was a demo preview for 2 robot concepts'));
+      assert.ok(announcement, where + ' Chrome accessibility tree omitted the checkout announcement');
+      let polite = announcement;
+      for (let depth = 0; polite && polite.role?.value !== 'status' && depth < 6; depth += 1) polite = nodes.get(polite.parentId);
+      assert.equal(polite?.role?.value, 'status', where + ' announcement is not in a status region');
+      assert.equal(polite?.properties?.find(property => property.name === 'live')?.value?.value, 'polite', where + ' announcement is not polite');
+
+      await evaluate(`(() => {
+        document.querySelector('#robotNickname').value = 'Home helper';
+        document.querySelector('#robotBrand').value = 'Example Robotics';
+        document.querySelector('#robotModel').value = 'Model A';
+        document.querySelector('#registerRobot').requestSubmit();
+      })()`);
+      await until(() => evaluate('document.querySelector("#myrobots h3") !== null'), where + ' saved demo profile');
+      const saved = await reveal('#myrobots h3');
+      assert.equal(saved.name, 'Home helper');
+      assert.ok(saved.top >= -0.5 && saved.gap >= -0.5, where + ' saved demo profile stays under the bottom nav (gap ' + saved.gap.toFixed(1) + 'px)');
+      assert.match(await evaluate('document.querySelector("#robotMessage").textContent'), /Demo profile saved locally/);
+      assert.match(await evaluate('document.querySelector("#robotMessage").textContent'), /Compatibility not verified; no device connected/);
+      assert.doesNotMatch(await evaluate('document.querySelector("#robots").innerText'), /buy now|place order|payment method|card number|verified compatible|connect your robot/i);
+    }
+  } finally {
+    await closeChromeAndCleanup(chrome, cdp, server, dir);
+  }
+});
