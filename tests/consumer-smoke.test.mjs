@@ -1440,10 +1440,11 @@ test('Discover concept search combines category filters, normalized terms and ac
 
   context.selectedCategory = 'education';
   render();
-  assert.equal(elements.products.innerHTML, '<p class="muted">No robot concepts match. Try another search or press Show all robot concepts.</p>');
+  assert.equal(elements.products.innerHTML, '<p class="muted">Nothing matched “HOME ROBOT” in Education. Press Show all robot concepts.</p>');
   assert.doesNotMatch(elements.products.innerHTML, /choose All robots/);
   assert.equal(elements.products.role, 'group', 'Empty results are not announced as a list');
-  assert.match(elements.filterSummary.textContent, /Showing 0 of 3 robot concepts in education/);
+  assert.match(elements.filterSummary.textContent, /Nothing matched your search\. Showing 0 of 3 robot concepts in education/);
+  assert.match(elements.filterSummary.textContent, /Press Show all robot concepts/);
 
   elements.robotSearch.value = '  educational   KIT ';
   render();
@@ -1471,7 +1472,9 @@ test('Discover concept search combines category filters, normalized terms and ac
 
 test('Discover no-results recovery clears both filters and restores all demo concepts', () => {
   assert.match(page, /id="resetDiscoverFilters" hidden>Show all robot concepts/);
-  assert.match(page, /No robot concepts match\. Try another search or press Show all robot concepts\./);
+  assert.match(page, /<p class="muted">Nothing matched '\+matchedLabel\+'\. Press Show all robot concepts\.<\/p>/);
+  assert.match(page, /Nothing matched'\+\(query\?' your search':''\)\+'\. '\+countSummary\+' Press Show all robot concepts\.'/);
+  assert.match(page, /if\(byId\('filterSummary'\)\.textContent!==summary\)byId\('filterSummary'\)\.textContent=summary/);
   assert.doesNotMatch(page, /choose All robots/);
   const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
   const resetSource = app.match(/byId\('resetDiscoverFilters'\)\.onclick=(\(\)=>\{[^\n]*\});/);
@@ -1501,7 +1504,8 @@ test('Discover no-results recovery clears both filters and restores all demo con
   const reset = new Script('(' + resetSource[1] + ')').runInNewContext(context);
   render();
   assert.equal(elements.resetDiscoverFilters.hidden, false, 'No matches shows recovery');
-  assert.equal(elements.products.innerHTML, '<p class="muted">No robot concepts match. Try another search or press Show all robot concepts.</p>');
+  assert.equal(elements.products.innerHTML, '<p class="muted">Nothing matched “home” in Companion. Press Show all robot concepts.</p>');
+  assert.match(elements.filterSummary.textContent, /Nothing matched your search\. Showing 0 of 2 robot concepts in companion/);
   assert.doesNotMatch(elements.products.innerHTML, /All robots/);
   reset();
   assert.equal(context.selectedCategory, 'all');
@@ -1514,6 +1518,117 @@ test('Discover no-results recovery clears both filters and restores all demo con
   assert.match(elements.products.innerHTML, /Home Robot Concept/);
   assert.match(elements.products.innerHTML, /Companion Robot Concept/);
   assert.equal(catalog.length, 2, 'Recovery must not modify catalog');
+});
+
+test('Discover no-results names a nonsense search, announces once, and keeps reset above the mobile nav', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 320x640 a nonsense Discover search left Clear search 71px under the fixed bottom nav and Show all robot concepts 171px under it\. At 390px that reset action stays above the nav, so this tightening applies only below 360px\./);
+  assert.match(mobile, /#store\.discover-empty #clearRobotSearch,\s*#store\.discover-empty #resetDiscoverFilters \{ margin-top: 2px; \}/);
+  assert.match(mobile, /#store\.discover-empty \.store-filters button \{\s*flex: 1 1 0;\s*min-width: 44px;/);
+  assert.match(mobile, /#store \.store-filters button,\s*#store #robotSearch,\s*#store #clearRobotSearch,\s*#store #resetDiscoverFilters,\s*#store #reviewDiscoverCart,\s*#store #openRobotsFromDiscover \{\s*box-sizing: border-box;\s*min-height: 44px;\s*min-width: 44px;\s*\}/);
+  assert.match(page, /id="filterSummary"[^>]*role="status" aria-live="polite"/);
+  assert.match(page, /<p class="muted">Nothing matched '\+matchedLabel\+'\. Press Show all robot concepts\.<\/p>/);
+  assert.doesNotMatch(page, /<p class="muted" role="status">Nothing matched/);
+  const storeMarkup = page.match(/<section id="store"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(storeMarkup && storeMarkup.indexOf('id="resetDiscoverFilters"') < storeMarkup.indexOf('id="products"'),
+    'Show all robot concepts stays above the concept cards');
+
+  const source = app.match(/function render\(\)\{[\s\S]*?\n(?=function show\()/);
+  const resetSource = app.match(/byId\('resetDiscoverFilters'\)\.onclick=(\(\)=>\{[^\n]*\});/);
+  assert.ok(source && resetSource, 'Discover recovery and renderer must exist');
+  const catalog = [
+    { id: 'r1', name: 'Home Robot Concept', category: 'home' },
+    { id: 'r2', name: 'Companion Robot Concept', category: 'companion' },
+    { id: 'r3', name: 'Educational Robotics Kit Concept', category: 'education' }
+  ];
+  const summary = {
+    value: '',
+    writes: 0,
+    get textContent() { return this.value; },
+    set textContent(next) { this.writes++; this.value = next; }
+  };
+  const geometry = { resultsBottom: 630, navTop: 777 };
+  let scrolled = 0;
+  const products = {
+    innerHTML: '',
+    role: '',
+    setAttribute(name, value) { if (name === 'role') this.role = value; },
+    getBoundingClientRect() { return { bottom: geometry.resultsBottom, top: geometry.resultsBottom }; }
+  };
+  const store = { className: '' };
+  store.classList = { toggle(name, on) { store.className = on ? name : ''; } };
+  const categoryButtons = ['all', 'home', 'companion', 'education'].map(category => ({
+    dataset: { category }, pressed: null,
+    setAttribute(name, value) { if (name === 'aria-pressed') this.pressed = value; }
+  }));
+  const elements = {
+    robotSearch: { value: 'zzzz-no-match', focused: false, focus() { this.focused = true; } },
+    clearRobotSearch: { hidden: true },
+    resetDiscoverFilters: { hidden: true },
+    filterSummary: summary,
+    products,
+    store,
+    skillcards: { innerHTML: '' },
+    servicecards: { innerHTML: '' }
+  };
+  const context = {
+    robots: catalog, skills: [], services: [], selectedCategory: 'all', cart: [],
+    byId: id => elements[id],
+    card: item => '<article>' + item.name + '</article>',
+    renderMyRobots: () => {}, updateSkillsRobotSummary: () => {}, updateServicesContext: () => {}, renderCart: () => {},
+    document: {
+      querySelector(selector) { return selector === '.tabs' ? { getBoundingClientRect: () => ({ top: geometry.navTop }) } : null; },
+      querySelectorAll(selector) { return selector === '[data-category]' ? categoryButtons : []; }
+    },
+    window: { scrollBy(_x, y) { scrolled += y; } }
+  };
+  const render = new Script('(' + source[0].trim() + ')').runInNewContext(context);
+  context.render = render;
+  const reset = new Script('(' + resetSource[1] + ')').runInNewContext(context);
+  render();
+  assert.equal(products.innerHTML, '<p class="muted">Nothing matched “zzzz-no-match”. Press Show all robot concepts.</p>');
+  assert.equal(products.role, 'group', 'No concept cards are exposed as a list');
+  assert.equal(elements.resetDiscoverFilters.hidden, false);
+  assert.equal(store.className, 'discover-empty');
+  assert.match(summary.value, /Nothing matched your search\. Showing 0 of 3 robot concepts matching your search\./);
+  assert.match(summary.value, /Press Show all robot concepts\./);
+  assert.match(summary.value, /Demo only; no robots are available to order\./);
+  assert.equal(summary.writes, 1, 'The polite summary is announced when results become empty');
+  assert.equal(scrolled, 0, 'At 390px Show all robot concepts is already above the bottom nav');
+
+  elements.robotSearch.value = 'zzzz-no-match-more';
+  render();
+  assert.equal(summary.writes, 1, 'Further unmatched typing must not repeat the live announcement');
+  assert.equal(products.innerHTML, '<p class="muted">Nothing matched “zzzz-no-match-more”. Press Show all robot concepts.</p>');
+  assert.equal(scrolled, 0, 'A 390px empty state still does not scroll');
+
+  geometry.resultsBottom = 826;
+  geometry.navTop = 573;
+  render();
+  assert.equal(scrolled, Math.ceil(826 - 573 + 8), 'At 320px the named empty state scrolls clear of the bottom nav');
+  assert.equal(summary.writes, 1, 'Scrolling the same empty state does not announce it again');
+
+  elements.robotSearch.value = 'zz<img alt="">';
+  render();
+  assert.equal(products.innerHTML, '<p class="muted">Nothing matched “zz&lt;img alt=&quot;&quot;&gt;”. Press Show all robot concepts.</p>');
+  assert.doesNotMatch(products.innerHTML, /<img/i);
+  assert.equal(summary.writes, 1, 'Escaped text in the visible message is not a second announcement');
+
+  reset();
+  assert.equal(context.selectedCategory, 'all');
+  assert.equal(elements.robotSearch.value, '');
+  assert.equal(elements.robotSearch.focused, true, 'Reset moves focus back to search');
+  assert.equal(elements.resetDiscoverFilters.hidden, true);
+  assert.equal(store.className, '', 'Restored concepts leave the narrow empty layout');
+  assert.equal(products.role, 'list');
+  assert.match(products.innerHTML, /Home Robot Concept/);
+  assert.match(products.innerHTML, /Companion Robot Concept/);
+  assert.match(products.innerHTML, /Educational Robotics Kit Concept/);
+  assert.match(summary.value, /^Showing 3 of 3 robot concepts\./);
+  assert.equal(summary.writes, 2, 'Restoring concepts announces the recovered count once');
+  assert.equal(catalog.length, 3, 'Recovery must not modify the concept catalog');
+  assert.equal(categoryButtons[0].pressed, 'true');
+  assert.ok(categoryButtons.slice(1).every(button => button.pressed === 'false'));
 });
 
 test('demo registration rejects invalid details before changing saved profiles', () => {
