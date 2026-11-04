@@ -51,3 +51,13 @@ test('timeout blocks later events except restart', () => {
 test('restart after completion re-enables mission zero', () => {
   assert.deepEqual(evaluate([['pickup',0],['delivery',0],['pickup',1],['delivery',1],['pickup',2],['delivery',2],'restart',['pickup',1],['pickup',0]]), [10,110,120,220,230,330,0,0,10]);
 });
+
+test('old mission events cannot farm points after advancement', () => {
+  assert.deepEqual(evaluate([['pickup',0],['delivery',0],['pickup',0],['delivery',0],['pickup',1],['delivery',1]]), [10,110,110,110,120,220]);
+});
+test('restart while carrying clears cargo and rejects delivery until pickup', () => {
+  assert.deepEqual(evaluate([['pickup',0],'restart',['delivery',0],['pickup',0],['delivery',0]]), [10,0,0,10,110]);
+});
+test('repeated collisions cannot make the score negative', () => {
+  assert.deepEqual(evaluate([['pickup',0],...Array(4).fill('collision'),['delivery',0]]), [10,5,0,0,0,100]);
+});
