@@ -2708,6 +2708,11 @@ test('mobile Services keeps both recovery actions readable before the preview li
   assert.ok(mobile.includes('#services > p:has(.next-step) { display: grid; gap: 8px; margin: 6px 0; }'));
   assert.ok(mobile.includes('#services .next-step { width: 100%; }'));
   assert.ok(mobile.includes('#services > .grid { margin-top: 8px; }'));
+  assert.match(mobile, /At 390px a long local demo profile name left Manage demo robots in Services about 3px under the fixed bottom nav/);
+  assert.match(mobile, /#services > p\.muted \{ margin-bottom: 2px; \}/);
+  assert.match(mobile, /#services > label \{ margin-bottom: 0; \}/);
+  assert.match(mobile, /#services #serviceRobotContext \{ margin-top: 0; margin-bottom: 0; \}/);
+  assert.match(mobile, /#services > p:has\(\.next-step\) \{ margin-top: 0; \}/);
   const services = page.match(/<section id="services"[\s\S]*?<\/section>/)?.[0];
   assert.ok(services, 'Expected Services section');
   assert.ok(services.indexOf('id="openSkillsFromServices"') < services.indexOf('id="servicecards"'));
@@ -2764,6 +2769,29 @@ test('mobile Skills keeps My Robots and Services actions above the fixed bottom 
   assert.match(page, /byId\('openServicesFromSkills'\)\.onclick=\(\)=>show\('services'\)/);
   assert.match(page, /byId\('openRobotsFromSkills'\)\.onclick=\(\)=>show\('robots'\)/);
   assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
+  assert.doesNotMatch(skills, /install now|compatible with your robot|book a service|payment/i);
+});
+
+test('mobile Skills handoff stays above the bottom nav at 390px in empty and filled states', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /At 390x844 the empty Skills status left Manage demo robots about 11px under the fixed bottom nav, and the filled status about 33px under it\. The handoff stays ahead of #skillsRobotSummary so both states clear the nav\./);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ margin-top: 0; \}/);
+  assert.match(mobile, /#skills #openRobotsFromSkills \{ box-sizing: border-box; min-height: 44px; min-width: 44px; width: 100%; \}/);
+  assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
+
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(skills, 'Expected Skills section');
+  const services = skills.indexOf('id="openServicesFromSkills"');
+  const select = skills.indexOf('id="skillRobotSelect"');
+  const robots = skills.indexOf('id="openRobotsFromSkills"');
+  const summary = skills.indexOf('id="skillsRobotSummary"');
+  const cards = skills.indexOf('id="skillcards"');
+  assert.ok(services > 0 && services < select && select < robots && robots < summary && summary < cards,
+    'Manage demo robots stays above the empty and filled status and above the skill preview list');
+  assert.match(skills, /id="openRobotsFromSkills">Manage demo robots →<\/button><p id="skillsRobotSummary" role="status"><\/p>/);
+  assert.match(app, /No demo robot profiles saved\. Press Explore service previews for generic service previews, or press Manage demo robots to add a demo robot profile\. Compatibility has not been checked; installation is unavailable\./);
+  assert.match(app, /Viewing generic skill previews for local demo profile: '\+selected\.name\+' — '\+selected\.brand\+' · '\+selected\.model\+'\. Compatibility has not been checked; installation is unavailable\. This selection also applies to generic Services previews; no booking or eligibility verification occurs\./);
+  assert.match(page, /byId\('openRobotsFromSkills'\)\.onclick=\(\)=>show\('robots'\)/);
   assert.doesNotMatch(skills, /install now|compatible with your robot|book a service|payment/i);
 });
 
