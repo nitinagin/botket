@@ -61,3 +61,25 @@ test('restart while carrying clears cargo and rejects delivery until pickup', ()
 test('repeated collisions cannot make the score negative', () => {
   assert.deepEqual(evaluate([['pickup',0],...Array(4).fill('collision'),['delivery',0]]), [10,5,0,0,0,100]);
 });
+
+
+test('invalid mission identifiers cannot award pickup or delivery points', () => {
+  assert.deepEqual(
+    evaluate([['pickup', '0'], ['pickup', -1], ['pickup', 0.5], ['delivery', 0], ['pickup', 0], ['delivery', '0'], ['delivery', 0]]),
+    [0, 0, 0, 0, 10, 10, 110]
+  );
+});
+
+test('collision after timeout cannot alter frozen score', () => {
+  assert.deepEqual(
+    evaluate([['pickup', 0], 'timeout', 'collision', ['delivery', 0], 'restart', 'collision']),
+    [10, 10, 10, 10, 0, 0]
+  );
+});
+
+test('collision after final delivery cannot reduce completed score', () => {
+  assert.deepEqual(
+    evaluate([['pickup', 0], ['delivery', 0], ['pickup', 1], ['delivery', 1], ['pickup', 2], ['delivery', 2], 'collision']),
+    [10, 110, 120, 220, 230, 330, 330]
+  );
+});
