@@ -3,6 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 function collisionScores(events, { cooldownMs, penalty = 5, initialScore = 30 }) {
+  for (const [name, value] of Object.entries({ cooldownMs, penalty, initialScore })) {
+    if (!Number.isSafeInteger(value) || value < 0 || (name === 'cooldownMs' && value === 0)) {
+      throw new RangeError(`${name} must be a valid nonnegative safe integer (positive for cooldownMs)`);
+    }
+  }
   let score = initialScore;
   let lastAcceptedAt = null;
   let lastSeenAt = null;
@@ -66,5 +71,18 @@ test('same-timestamp duplicate collisions do not bypass cooldown', () => {
 test('non-finite, fractional, and unsafe timestamps are rejected', () => {
   for (const elapsedMs of [NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, null]) {
     assert.throws(() => collisionScores([{ type: 'collision', elapsedMs }], { cooldownMs: 500 }), RangeError);
+  }
+});
+
+// Validation must run in the scoring path, not only in a separate reference fixture.
+test('collision scoring rejects invalid configuration before any events', () => {
+  for (const cooldownMs of [undefined, 0, NaN, Infinity, -1, 0.5, '500']) {
+    assert.throws(() => collisionScores([], { cooldownMs }), RangeError);
+  }
+  for (const penalty of [NaN, -1, 1.5, '5']) {
+    assert.throws(() => collisionScores([], { cooldownMs: 500, penalty }), RangeError);
+  }
+  for (const initialScore of [NaN, -1, 1.5, '30']) {
+    assert.throws(() => collisionScores([], { cooldownMs: 500, initialScore }), RangeError);
   }
 });
