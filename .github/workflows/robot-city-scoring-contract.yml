@@ -1,0 +1,28 @@
+name: Robot City scoring contract reference tests
+
+on:
+  pull_request:
+    paths:
+      - 'tests/robot-city-scoring-contract.test.mjs'
+      - '.github/workflows/robot-city-scoring-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/robot-city-scoring-contract.test.mjs'
+      - '.github/workflows/robot-city-scoring-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-scoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run draft scoring reference fixtures (not gameplay integration)
+        run: node --test tests/robot-city-scoring-contract.test.mjs
