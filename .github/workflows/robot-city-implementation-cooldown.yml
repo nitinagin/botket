@@ -1,0 +1,26 @@
+name: Robot City implementation cooldown tests
+
+on:
+  pull_request:
+    paths:
+      - 'robot-city.html'
+      - 'tests/robot-city-implementation-cooldown.test.mjs'
+      - '.github/workflows/robot-city-implementation-cooldown.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cooldown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check test syntax
+        run: node --check tests/robot-city-implementation-cooldown.test.mjs
+      - name: Execute implementation cooldown tests
+        run: node --test tests/robot-city-implementation-cooldown.test.mjs
