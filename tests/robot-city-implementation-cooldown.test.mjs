@@ -30,7 +30,7 @@ function makeGame() {
 
 test('real game step applies only one collision penalty during 500ms cooldown', () => {
   const game = makeGame();
-  game.setRobot(21, 480, Math.PI);
+  game.setRobot(20, 480, Math.PI);
   game.setScore(10);
   game.hold();
   game.step(0.01);
@@ -47,7 +47,7 @@ test('real game step applies only one collision penalty during 500ms cooldown', 
 
 test('real game collision never lowers score below zero and reset clears cooldown', () => {
   const game = makeGame();
-  game.setRobot(21, 480, Math.PI);
+  game.setRobot(20, 480, Math.PI);
   game.hold();
   game.step(0.01);
   assert.equal(game.getState().score, 0);
