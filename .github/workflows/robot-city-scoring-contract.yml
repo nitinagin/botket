@@ -5,12 +5,14 @@ on:
     paths:
       - 'tests/robot-city-scoring-contract.test.mjs'
       - 'tests/robot-city-collision-cooldown.test.mjs'
+      - 'tests/robot-city-config-validation.test.mjs'
       - '.github/workflows/robot-city-scoring-contract.yml'
   push:
     branches: [main]
     paths:
       - 'tests/robot-city-scoring-contract.test.mjs'
       - 'tests/robot-city-collision-cooldown.test.mjs'
+      - 'tests/robot-city-config-validation.test.mjs'
       - '.github/workflows/robot-city-scoring-contract.yml'
   workflow_dispatch:
 
@@ -27,4 +29,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run draft scoring reference fixtures (not gameplay integration)
-        run: node --test tests/robot-city-scoring-contract.test.mjs tests/robot-city-collision-cooldown.test.mjs
+        run: node --test tests/robot-city-scoring-contract.test.mjs tests/robot-city-collision-cooldown.test.mjs tests/robot-city-config-validation.test.mjs
