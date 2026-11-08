@@ -17,4 +17,5 @@ assert.match(html, /href="https:\/\/github\.com\/nitinagin\/botket\/pull\/102"/,
 assert.match(html, /no verified X2 Ultra specifications or 3D model assets/i, 'no unverified AgiBot specifications');
 assert.match(html, /not confirmed partner products/i, 'generic robots not represented as partners');
 assert.match(html, /href="https:\/\/www\.agibot\.com\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/, 'manufacturer link uses safe new-tab attributes');
-console.log('PASS: 12 showroom static regression checks');
+assert.match(html, /href="https:\/\/github\.com\/nitinagin\/botket\/issues\/119"[^>]*rel="noopener noreferrer"/, 'public verification tracker is linked safely');
+console.log('PASS: 13 showroom static regression checks');
