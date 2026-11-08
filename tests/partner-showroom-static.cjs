@@ -14,4 +14,7 @@ assert.doesNotMatch(html, /<img\b/i, 'no externally hosted image assets');
 assert.doesNotMatch(html, /<script\b/i, 'static page without JavaScript');
 assert.match(html, /no AI training, physics-accurate simulation/i, 'capability limitations');
 assert.match(html, /href="https:\/\/github\.com\/nitinagin\/botket\/pull\/102"/, 'Robot City development PR link');
-console.log('PASS: 9 showroom static regression checks');
+assert.match(html, /no verified X2 Ultra specifications or 3D model assets/i, 'no unverified AgiBot specifications');
+assert.match(html, /not confirmed partner products/i, 'generic robots not represented as partners');
+assert.match(html, /href="https:\/\/www\.agibot\.com\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/, 'manufacturer link uses safe new-tab attributes');
+console.log('PASS: 12 showroom static regression checks');
