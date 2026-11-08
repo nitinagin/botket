@@ -18,4 +18,13 @@ assert.match(html, /no verified X2 Ultra specifications or 3D model assets/i, 'n
 assert.match(html, /not confirmed partner products/i, 'generic robots not represented as partners');
 assert.match(html, /href="https:\/\/www\.agibot\.com\/"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/, 'manufacturer link uses safe new-tab attributes');
 assert.match(html, /href="https:\/\/github\.com\/nitinagin\/botket\/issues\/119"[^>]*rel="noopener noreferrer"/, 'public verification tracker is linked safely');
-console.log('PASS: 13 showroom static regression checks');
+
+// Guard against accidental third-party asset loads or unsafe external navigation.
+assert.doesNotMatch(html, /<(?:iframe|video|audio|object|embed|link|source)\b/i, 'no embedded remote assets or stylesheets');
+const externalAnchors = [...html.matchAll(/<a\b[^>]*href="https?:\/\/[^\"]+"[^>]*>/gi)];
+assert.ok(externalAnchors.length >= 3, 'reference and tracker links exist');
+for (const [anchor] of externalAnchors) {
+  assert.match(anchor, /target="_blank"/, 'external links open in a new tab');
+  assert.match(anchor, /rel="noopener noreferrer"/, 'external links protect opener and referrer');
+}
+console.log('PASS: 15 showroom static regression checks');
