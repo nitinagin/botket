@@ -13,5 +13,5 @@ assert.match(html, /@media\(max-width:800px\)/, 'responsive breakpoint');
 assert.doesNotMatch(html, /<img\b/i, 'no externally hosted image assets');
 assert.doesNotMatch(html, /<script\b/i, 'static page without JavaScript');
 assert.match(html, /no AI training, physics-accurate simulation/i, 'capability limitations');
-assert.match(html, /href="robot-city\.html"/, 'Robot City prototype link');
+assert.match(html, /href="https:\/\/github\.com\/nitinagin\/botket\/pull\/102"/, 'Robot City development PR link');
 console.log('PASS: 9 showroom static regression checks');
