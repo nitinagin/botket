@@ -27,4 +27,5 @@ for (const [anchor] of externalAnchors) {
   assert.match(anchor, /target="_blank"/, 'external links open in a new tab');
   assert.match(anchor, /rel="noopener noreferrer"/, 'external links protect opener and referrer');
 }
-console.log('PASS: 15 showroom static regression checks');
+assert.equal(count(/<span class="pill">(?:MANUFACTURER REFERENCE|BOTKET CONCEPT) · NOT INTEGRATED<\/span>/g), 3, 'each robot card explicitly marked not integrated');
+console.log('PASS: 16 showroom static regression checks');
