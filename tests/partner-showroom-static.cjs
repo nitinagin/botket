@@ -28,4 +28,10 @@ for (const [anchor] of externalAnchors) {
   assert.match(anchor, /rel="noopener noreferrer"/, 'external links protect opener and referrer');
 }
 assert.equal(count(/<span class="pill">(?:MANUFACTURER REFERENCE|BOTKET CONCEPT) · NOT INTEGRATED<\/span>/g), 3, 'each robot card explicitly marked not integrated');
-console.log('PASS: 16 showroom static regression checks');
+// Customer-facing catalog safety gates: no fictitious commerce or partner claims.
+assert.doesNotMatch(html, /<button[^>]*>[^<]*(?:checkout|buy now|add to cart)/i, 'no transactional CTAs');
+assert.doesNotMatch(html, /(?:in stock|official partner|authorized reseller|ready to ship)/i, 'no unsupported commercial status');
+assert.match(html, /not confirmed BOTKET inventory/i, 'catalog does not imply inventory');
+assert.match(html, /Verified model-specific numerical specifications: not yet available/i, 'unverified specifications disclosed');
+assert.match(html, /Illustration is generic, not an AgiBot model/i, 'generic art distinguished from product photo');
+console.log('PASS: 21 showroom static regression checks');
