@@ -1,0 +1,15 @@
+{
+  "rulesVersion": "robot-city-demo-v1",
+  "demoOnly": true,
+  "scoringFinal": false,
+  "pointsOnPickup": 10,
+  "pointsPerDelivery": 100,
+  "collisionPenalty": 1,
+  "collisionCooldownSeconds": 0.5,
+  "scoreFloor": 0,
+  "roundTimeLimitSeconds": null,
+  "deliveriesLoop": true,
+  "fixedMissionCountEnd": false,
+  "scriptedScoresSameAsManual": true,
+  "notes": "Demo contract only. Matches the browser prototype at e4456e3 and draft PR #115 (Option A on issue #99). Not approved final challenge rules. Not a Roblox Studio playtest."
+}

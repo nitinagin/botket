@@ -3,6 +3,10 @@
 -- Demo-only shared config. Not verified in Roblox Studio. Not published.
 -- Not the Challenge Schema (repository issue #99). Schema work stays in a separate issue/PR.
 --
+-- Scoring label rulesVersion "robot-city-demo-v1" matches the browser prototype
+-- (robot-city.html at e4456e3) and draft PR #115. scoring.final is false.
+-- These are demo rules, not approved challenge rules.
+--
 -- Studio paste: ModuleScript named ChallengeConfig, parented to ReplicatedStorage.
 -- Units: studs, seconds, points, and radians (spawnYaw and turnRate).
 
@@ -51,6 +55,7 @@ export type ChallengeConfig = {
 	title: string,
 	track: string,
 	demoOnly: boolean,
+	rulesVersion: string,
 	disclaimer: string,
 	arena: {
 		sizeX: number,
@@ -76,9 +81,9 @@ export type ChallengeConfig = {
 	scoring: {
 		pointsOnPickup: number,
 		pointsPerDelivery: number,
-		timeLimitSeconds: number,
 		collisionPenalty: number,
-		collisionDebounceSeconds: number,
+		collisionCooldownSeconds: number,
+		final: boolean,
 	},
 }
 
@@ -101,8 +106,9 @@ end
 --   South-east building  x  21..43,  z  18..42
 --   Center kiosk         x  -5..5,   z  -5..5
 -- Robot spawn center is x -50, z -14, facing +Z (spawnYaw = pi).
--- Missions run in order. toPickup and toDropOff are street waypoints for the
--- scripted auto-drive. They are not a published route graph.
+-- Routes run in order and then repeat. There is no fixed end after the last
+-- route and no round time limit. toPickup and toDropOff are street waypoints
+-- for the scripted auto-drive. They are not a published route graph.
 local PICKUP_COLOR = rgb(48, 128, 214)
 local DROPOFF_COLOR = rgb(36, 168, 112)
 
@@ -114,7 +120,9 @@ local function zone(name: string, centerX: number, centerZ: number, sizeX: numbe
 		sizeX = sizeX,
 		sizeY = 6,
 		sizeZ = sizeZ,
-		color = color,
+		-- Each zone owns its color table. The shared palette tables are reused
+		-- by every route, and table.freeze errors if the same table is frozen twice.
+		color = rgb(color.r, color.g, color.b),
 	}
 end
 
@@ -129,7 +137,8 @@ local config: ChallengeConfig = {
 	title = "Robot City - Autonomous Delivery Challenge #001",
 	track = "virtual",
 	demoOnly = true,
-	disclaimer = "Demo source only. Not verified in Roblox Studio. Not published. Scripted driving aid only. Not the Challenge Schema.",
+	rulesVersion = "robot-city-demo-v1",
+	disclaimer = "Demo source only. Not verified in Roblox Studio. Not published. Scripted driving aid only. Not the Challenge Schema. Scoring follows robot-city-demo-v1 and is not final.",
 	arena = {
 		sizeX = 120,
 		sizeZ = 120,
@@ -227,9 +236,9 @@ local config: ChallengeConfig = {
 	scoring = {
 		pointsOnPickup = 10,
 		pointsPerDelivery = 100,
-		timeLimitSeconds = 240,
-		collisionPenalty = 5,
-		collisionDebounceSeconds = 0.75,
+		collisionPenalty = 1,
+		collisionCooldownSeconds = 0.5,
+		final = false,
 	},
 }
 
