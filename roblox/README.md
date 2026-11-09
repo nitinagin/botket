@@ -9,10 +9,10 @@ No paid services, purchases, or vendor commitments are added here.
 ## What you can do in a local Studio playtest
 
 - Drive one robot with WASD or the on-screen touch joystick.
-- Complete three pickup and delivery missions in order. The blue pickup and green drop-off move when a delivery is finished.
-- See score, deliveries, collisions, the current mission, and time remaining.
-- Turn **Scripted AI** on or off from the HUD. Manual driving remains available when it is off.
-- Press **Restart** to run the round again from mission 1.
+- Pick up the blue package and deliver it to the green drop-off. The three street routes repeat, and the round does not end after three deliveries.
+- See score, deliveries, collisions, and elapsed time. Elapsed time is a display. The HUD has no countdown and no mission-of-3 counter.
+- Turn **Scripted AI** on or off from the HUD. Manual driving remains available when it is off. Both modes use the same scoring path.
+- Press **Restart** to clear the round and put the robot back at the spawn.
 
 Scripted AI follows street waypoints and turns away from a nearby wall or building. It is a short driving script, not trained machine learning, not ROS 2, and not a claim that a route will always succeed.
 
@@ -44,17 +44,21 @@ Check the Output window if the HUD stays on "Waiting for the delivery robot...".
 | Scripted AI | Toggles waypoint auto-drive. While it is on, WASD and the joystick do not drive. |
 | Restart | Asks the server to run `restartRound` |
 
-`restartRound` is a function in `DeliveryManager`. It puts the robot back at the spawn, returns to mission 1, clears score, deliveries, collisions, and cargo, switches drive mode back to manual, and starts the timer again. Restart still works after the time limit or after all three deliveries.
+`restartRound` is a function in `DeliveryManager`. It puts the robot back at the spawn, returns to the first route, clears score, deliveries, collisions, cargo, elapsed time, and the collision cooldown, and switches drive mode back to manual.
 
 ## Round and scoring
 
-Demo constants live in `ChallengeConfig`. They are not final challenge rules.
+Demo constants live in `ChallengeConfig`. The label is `rulesVersion` `robot-city-demo-v1`, with `demoOnly` true and `scoring.final` false. These match the browser prototype in [draft PR #102](https://github.com/nitinagin/botket/pull/102) (`robot-city.html` at `e4456e3`) and the contract proposed in [draft PR #115](https://github.com/nitinagin/botket/pull/115), which is Option A on [issue #99](https://github.com/nitinagin/botket/issues/99#issuecomment-6736232903). They are not approved final challenge rules. `roblox/scoring-contract.json` records the same numbers.
 
-- Three missions, in order: west to east, north to south, then southwest to northeast.
-- Touching the active pickup, or overlapping it, awards `pointsOnPickup` (10) and arms the drop-off.
-- Touching the active drop-off, or overlapping it, awards `pointsPerDelivery` (100) and advances the mission.
-- A wall or building touch subtracts `collisionPenalty` (5), at most once per `collisionDebounceSeconds` (0.75). The score does not go below 0.
-- The round ends at `timeLimitSeconds` (240) or when all three deliveries are complete. Elapsed time is shown; it is not added into the score number.
+- Pickup awards `pointsOnPickup` (10) and arms the drop-off.
+- A delivery awards `pointsPerDelivery` (100). The same pickup or drop-off is not awarded twice without the cargo state changing.
+- A wall or building touch subtracts `collisionPenalty` (1), at most once per `collisionCooldownSeconds` (0.5, which is 500 ms). The score does not go below 0.
+- Routes repeat in order: west to east, north to south, then southwest to northeast, then the first route again. There is no fixed three-mission end state.
+- There is no round time limit. Elapsed time is shown on the HUD and is not part of the score.
+- Scripted AI and manual driving call the same pickup, delivery, and collision scoring. Scripted driving does not add a bonus or an extra penalty.
+- Restart clears score, deliveries, collisions, cargo, the collision cooldown, elapsed time, the route index, and waypoints, and places the robot at the spawn. Drive mode returns to manual.
+
+`loadConfig()` accepts one or more routes. An empty route list is rejected. A single route is valid and repeats. The shipped arena still defines three routes.
 
 Zone parts use `Touched`. The server also treats the robot as inside a zone when its hull overlaps that zone, because a physics touch can be missed. Only the delivery robot counts.
 
@@ -62,7 +66,7 @@ There is one robot, created for the first player who joins. Later players do not
 
 ## Schema coordination
 
-This folder lines up with the Virtual-track discussion in [issue #99](https://github.com/nitinagin/botket/issues/99) only as a gameplay sketch: one arena, obstacles, deliveries, collisions, and elapsed time. It does not add the shared Challenge Schema. That schema is still a separate issue and pull request. [Issue #101](https://github.com/nitinagin/botket/issues/101) lists a shared schema as an acceptance item that this PR does not complete. Numbers in `ChallengeConfig` are local demo values.
+This folder lines up with the Virtual-track discussion in [issue #99](https://github.com/nitinagin/botket/issues/99) as a gameplay sketch: one arena, obstacles, repeating deliveries, collisions, and elapsed time. `rulesVersion` `robot-city-demo-v1` is the demo scoring label from Option A. It is not the shared Challenge Schema, and `scoring.final` stays false. That schema is still a separate issue and pull request. [Issue #101](https://github.com/nitinagin/botket/issues/101) lists a shared schema as an acceptance item that this folder does not complete.
 
 ## Checks outside Studio
 
@@ -72,6 +76,14 @@ On 1 Nov 2026 these files were parsed and checked with official release binaries
 - Selene 0.32.0 (`selene-0.32.0-linux.zip`, sha256 `d3773393578580074386e69337d35b7acddfbaa9fc38964c07fa3e28436ade9b`) with `std = "roblox"` exited 0.
 
 Those commands are not run in CI. A clean result is not a Studio playtest.
+
+The scoring contract can be checked without Roblox Studio:
+
+```bash
+node --test roblox/check-scoring-parity.mjs
+```
+
+That test reads `roblox/scoring-contract.json` and the Luau sources. It checks the agreed constants, the score floor, the 500 ms collision cooldown, the repeating routes, and that the HUD does not show a countdown or a mission-of-3 counter. It does not execute Luau and it does not open Roblox Studio.
 
 ## Limitations
 

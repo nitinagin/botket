@@ -6,6 +6,8 @@
 -- StarterPlayer.StarterPlayerScripts.
 -- Manual drive: MovementInput. Scripted auto toggle: DriveMode. Restart: Restart.
 -- Score snapshots arrive on ChallengeState.
+-- The HUD shows score, deliveries, collisions, and elapsed time.
+-- Elapsed time is a display. There is no countdown and no mission counter.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -146,9 +148,6 @@ local function showStatus(
 	elapsed: number,
 	carrying: boolean,
 	status: string,
-	timeLimit: number,
-	missionIndex: number,
-	missionCount: number,
 	driveMode: string
 )
 	currentDriveMode = driveMode
@@ -157,19 +156,13 @@ local function showStatus(
 	else
 		modeButton.Text = "Scripted AI: Off"
 	end
-	local remaining = timeLimit - elapsed
-	if remaining < 0 then
-		remaining = 0
-	end
 	local carryText = if carrying then "yes" else "no"
 	statusLabel.Text = string.format(
-		"Score %d    Deliveries %d    Collisions %d\nMission %d/%d    Time left %ds    Carrying %s\n%s\n%s",
+		"Score %d    Deliveries %d    Collisions %d\nElapsed %ds    Carrying %s\n%s\n%s",
 		score,
 		deliveries,
 		collisions,
-		missionIndex,
-		missionCount,
-		remaining,
+		elapsed,
 		carryText,
 		status,
 		controlHint()
@@ -183,24 +176,18 @@ local function onState(
 	elapsed: any,
 	carrying: any,
 	status: any,
-	timeLimit: any,
-	missionIndex: any,
-	missionCount: any,
 	driveMode: any
 )
 	if typeof(score) ~= "number" or typeof(deliveries) ~= "number" or typeof(collisions) ~= "number" then
 		return
 	end
-	if typeof(elapsed) ~= "number" or typeof(timeLimit) ~= "number" then
+	if typeof(elapsed) ~= "number" then
 		return
 	end
-	if typeof(carrying) ~= "boolean" or typeof(status) ~= "string" then
+	if typeof(carrying) ~= "boolean" or typeof(status) ~= "string" or typeof(driveMode) ~= "string" then
 		return
 	end
-	if typeof(missionIndex) ~= "number" or typeof(missionCount) ~= "number" or typeof(driveMode) ~= "string" then
-		return
-	end
-	showStatus(score, deliveries, collisions, elapsed, carrying, status, timeLimit, missionIndex, missionCount, driveMode)
+	showStatus(score, deliveries, collisions, elapsed, carrying, status, driveMode)
 end
 
 local function keyboardAxes(): (number, number)

@@ -1,7 +1,9 @@
 --!strict
 -- BOTKET Robot City - Autonomous Delivery Challenge #001
 -- Demo-only server script. Not verified in Roblox Studio. Not published.
--- One robot. Sequential delivery missions. Scripted waypoint auto-drive, not a trained model.
+-- One robot. Pickup and delivery repeat. Scripted waypoint auto-drive, not a trained model.
+-- Scoring matches ChallengeConfig rulesVersion robot-city-demo-v1 (browser / draft #115).
+-- Manual and scripted drive use the same pickup, delivery, and collision scoring path.
 --
 -- Studio paste: Script named DeliveryManager, parented to ServerScriptService.
 -- Requires the ModuleScript ReplicatedStorage.ChallengeConfig.
@@ -13,8 +15,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local STATUS_TIME_UP = "Time is up."
-local STATUS_COMPLETE = "All deliveries are complete."
 local INPUT_TIMEOUT_SECONDS = 0.3
 local MAX_STEP_SECONDS = 0.1
 local WAYPOINT_RADIUS = 6
@@ -66,6 +66,7 @@ type Config = {
 	title: string,
 	track: string,
 	demoOnly: boolean,
+	rulesVersion: string,
 	disclaimer: string,
 	arena: {
 		sizeX: number,
@@ -91,9 +92,9 @@ type Config = {
 	scoring: {
 		pointsOnPickup: number,
 		pointsPerDelivery: number,
-		timeLimitSeconds: number,
 		collisionPenalty: number,
-		collisionDebounceSeconds: number,
+		collisionCooldownSeconds: number,
+		final: boolean,
 	},
 }
 
@@ -308,8 +309,20 @@ local function loadConfig(): Config
 		end
 		table.insert(missions, readMission(entry, "missions[" .. tostring(index) .. "]"))
 	end
-	if #missions < 2 then
-		fail("missions must include more than one delivery")
+	if #missions == 0 then
+		fail("missions must include at least one delivery")
+	end
+
+	local rulesVersion = readString(root.rulesVersion, "rulesVersion")
+	if rulesVersion ~= "robot-city-demo-v1" then
+		fail("rulesVersion must be robot-city-demo-v1")
+	end
+	if scoring.timeLimitSeconds ~= nil then
+		fail("scoring.timeLimitSeconds is not used; this demo has no round time limit")
+	end
+	local scoringFinal = readBoolean(scoring.final, "scoring.final")
+	if scoringFinal ~= false then
+		fail("scoring.final must be false until challenge rules are approved")
 	end
 
 	return {
@@ -317,6 +330,7 @@ local function loadConfig(): Config
 		title = readString(root.title, "title"),
 		track = readString(root.track, "track"),
 		demoOnly = readBoolean(root.demoOnly, "demoOnly"),
+		rulesVersion = rulesVersion,
 		disclaimer = readString(root.disclaimer, "disclaimer"),
 		arena = {
 			sizeX = readPositive(arena.sizeX, "arena.sizeX"),
@@ -342,9 +356,9 @@ local function loadConfig(): Config
 		scoring = {
 			pointsOnPickup = readNonNegative(scoring.pointsOnPickup, "scoring.pointsOnPickup"),
 			pointsPerDelivery = readNonNegative(scoring.pointsPerDelivery, "scoring.pointsPerDelivery"),
-			timeLimitSeconds = readPositive(scoring.timeLimitSeconds, "scoring.timeLimitSeconds"),
 			collisionPenalty = readNonNegative(scoring.collisionPenalty, "scoring.collisionPenalty"),
-			collisionDebounceSeconds = readNonNegative(scoring.collisionDebounceSeconds, "scoring.collisionDebounceSeconds"),
+			collisionCooldownSeconds = readNonNegative(scoring.collisionCooldownSeconds, "scoring.collisionCooldownSeconds"),
+			final = scoringFinal,
 		},
 	}
 end
@@ -388,6 +402,8 @@ local function buildArena(config: Config): BuiltZones
 	arenaFolder:SetAttribute("Title", config.title)
 	arenaFolder:SetAttribute("Track", config.track)
 	arenaFolder:SetAttribute("DemoOnly", config.demoOnly)
+	arenaFolder:SetAttribute("RulesVersion", config.rulesVersion)
+	arenaFolder:SetAttribute("ScoringFinal", config.scoring.final)
 	arenaFolder:SetAttribute("Disclaimer", config.disclaimer)
 	arenaFolder.Parent = Workspace
 
@@ -491,13 +507,12 @@ local function buildArena(config: Config): BuiltZones
 		return zone
 	end
 
-	local missionCount = #config.missions
 	local firstMission = config.missions[1]
 	if firstMission == nil then
 		fail("missions[1] is missing")
 	end
-	local pickup = buildZone(firstMission.pickup, string.format("Pickup 1/%d", missionCount))
-	local dropOff = buildZone(firstMission.dropOff, string.format("Drop-off 1/%d", missionCount))
+	local pickup = buildZone(firstMission.pickup, "Pickup")
+	local dropOff = buildZone(firstMission.dropOff, "Drop-off")
 	pickup.Name = "PickupZone"
 	dropOff.Name = "DropOffZone"
 	return {
@@ -566,9 +581,7 @@ local function publish(record: RobotRecord)
 	record.model:SetAttribute("ElapsedTime", elapsedWhole)
 	record.model:SetAttribute("Carrying", record.carrying)
 	record.model:SetAttribute("Status", record.status)
-	record.model:SetAttribute("TimeLimitSeconds", config.scoring.timeLimitSeconds)
 	record.model:SetAttribute("MissionIndex", record.missionIndex)
-	record.model:SetAttribute("MissionCount", #config.missions)
 	record.model:SetAttribute("DriveMode", record.driveMode)
 	record.cargo.Color = if record.carrying then Color3.fromRGB(140, 214, 255) else Color3.fromRGB(88, 96, 108)
 	challengeState:FireClient(
@@ -579,9 +592,6 @@ local function publish(record: RobotRecord)
 		elapsedWhole,
 		record.carrying,
 		record.status,
-		config.scoring.timeLimitSeconds,
-		record.missionIndex,
-		#config.missions,
 		record.driveMode
 	)
 end
@@ -603,7 +613,7 @@ local function dropOffStatus(index: number): string
 end
 
 local function roundOpen(record: RobotRecord): boolean
-	return not record.removed and record.status ~= STATUS_TIME_UP and record.status ~= STATUS_COMPLETE
+	return not record.removed
 end
 
 local function setZone(zone: any, spec: ZoneSpec, labelText: string)
@@ -625,23 +635,16 @@ local function placeMission(index: number)
 	if mission == nil then
 		fail("mission " .. tostring(index) .. " is missing")
 	end
-	local count = #config.missions
-	setZone(zones.pickup, mission.pickup, string.format("Pickup %d/%d", index, count))
-	setZone(zones.dropOff, mission.dropOff, string.format("Drop-off %d/%d", index, count))
+	setZone(zones.pickup, mission.pickup, "Pickup")
+	setZone(zones.dropOff, mission.dropOff, "Drop-off")
 end
 
 local function applyMotion(record: RobotRecord, dt: number)
-	local frozen = not roundOpen(record)
-	if not frozen then
-		record.yaw += record.steer * config.robot.turnRate * dt
-	end
+	record.yaw += record.steer * config.robot.turnRate * dt
 	local rotation = CFrame.Angles(0, record.yaw, 0)
 	record.align.CFrame = rotation
 	local look = rotation.LookVector
-	local speed = 0
-	if not frozen then
-		speed = record.throttle * config.robot.speed
-	end
+	local speed = record.throttle * config.robot.speed
 	local vertical = record.hull.AssemblyLinearVelocity.Y
 	if typeof(vertical) ~= "number" then
 		vertical = 0
@@ -664,7 +667,7 @@ local function onHullTouched(record: RobotRecord, hit: any)
 		return
 	end
 	local now = os.clock()
-	if now - record.lastCollisionAt < config.scoring.collisionDebounceSeconds then
+	if now - record.lastCollisionAt < config.scoring.collisionCooldownSeconds then
 		return
 	end
 	record.lastCollisionAt = now
@@ -701,6 +704,7 @@ local function completePickup(record: RobotRecord)
 	publish(record)
 end
 
+-- Routes wrap back to the first pickup. A delivery does not end the round.
 local function completeDropOff(record: RobotRecord)
 	if not roundOpen(record) or not record.carrying then
 		return
@@ -710,16 +714,13 @@ local function completeDropOff(record: RobotRecord)
 	record.score += config.scoring.pointsPerDelivery
 	record.waypointIndex = 1
 	record.evadeUntil = 0
-	if record.missionIndex >= #config.missions then
-		record.status = STATUS_COMPLETE
-		record.throttle = 0
-		record.steer = 0
-		record.driveMode = "manual"
-	else
-		record.missionIndex += 1
-		placeMission(record.missionIndex)
-		record.status = pickupStatus(record.missionIndex)
+	local nextIndex = record.missionIndex + 1
+	if nextIndex > #config.missions then
+		nextIndex = 1
 	end
+	record.missionIndex = nextIndex
+	placeMission(record.missionIndex)
+	record.status = pickupStatus(record.missionIndex)
 	publish(record)
 end
 
@@ -1130,22 +1131,6 @@ RunService.Heartbeat:Connect(function(dt: number)
 			continue
 		end
 		record.elapsed = now - record.startedAt
-		if record.status ~= STATUS_COMPLETE and record.elapsed >= config.scoring.timeLimitSeconds then
-			record.throttle = 0
-			record.steer = 0
-			if record.status ~= STATUS_TIME_UP then
-				record.status = STATUS_TIME_UP
-				publish(record)
-			end
-			applyMotion(record, dt)
-			continue
-		end
-		if not roundOpen(record) then
-			record.throttle = 0
-			record.steer = 0
-			applyMotion(record, dt)
-			continue
-		end
 		if record.driveMode == "auto" then
 			scriptedDrive(record)
 		elseif now - record.lastInputAt > INPUT_TIMEOUT_SECONDS then
