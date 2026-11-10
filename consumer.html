@@ -219,6 +219,12 @@
 #items > button[data-cart-robots]{background:#e4efe7;color:#111;border:2px solid #111;font-weight:800}
 input::placeholder,input:disabled::placeholder{color:#616b66;opacity:1}
 input:disabled,select:disabled,#skillcards button:disabled{opacity:1;color:#111;background:#efefef;-webkit-text-fill-color:#111}
+
+/* Manufacturer-reference cards: usable touch targets without changing demo cart logic. */
+#realRobotReferences .card a{display:inline-flex;align-items:center;min-height:48px;padding:8px 12px;box-sizing:border-box;border:2px solid #126b7d;border-radius:10px;font-weight:700;line-height:1.35}
+#realRobotReferences .card a:focus-visible{outline:3px solid #111;outline-offset:4px}
+#realRobotReferences .card{min-width:0;overflow-wrap:anywhere}
+@media(max-width:640px){#realRobotReferences{padding:12px!important}#realRobotReferences .grid{display:grid;grid-template-columns:minmax(0,1fr)}#realRobotReferences .card a{width:100%;justify-content:center;text-align:center}}
 </style>
 <link rel="icon" type="image/svg+xml" href="assets/botket-logo.svg"></head><body>
 <a class="skip-link" href="#main-content">Skip to consumer platform</a>
