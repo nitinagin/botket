@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const html = fs.readFileSync('partner-showroom.html', 'utf8');
 const checks = [
   ['concept and integration disclaimers', /CONCEPT[\s\S]*NOT INTEGRATED/i.test(html)],
+  ['three named manufacturer references', ['AgiBot X2 family', 'Unitree G1', 'Universal Robots e-Series'].every(name => html.includes('<h2>' + name + '</h2>'))],
+  ['three explicitly not integrated cards', (html.match(/MANUFACTURER REFERENCE · NOT INTEGRATED/g) || []).length === 3],
   ['Issue 119 traceability', html.includes('github.com/nitinagin/botket/issues/119')],
   ['manufacturer reference disclaimer', /manufacturer references only/i.test(html)],
   ['no remote hosted manufacturer imagery', !/<img\b[^>]*src\s*=\s*['\"]https?:/i.test(html)],
@@ -13,4 +15,4 @@ const checks = [
   ['no claim of live robot city', /not a live playable deployment/i.test(html)],
 ];
 for (const [name, pass] of checks) { console.log((pass ? 'PASS' : 'FAIL') + ': ' + name); assert.ok(pass, name); }
-console.log('7/7 static showroom safety checks passed; browser and source verification still required.');
+console.log('9/9 static showroom safety checks passed; browser and source verification still required.');
