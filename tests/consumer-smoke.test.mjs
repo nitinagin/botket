@@ -62,7 +62,8 @@ test('mobile focus targets clear the fixed bottom navigation', () => {
 test('buttons, fields, selects, and links keep a 3px keyboard focus ring', () => {
   assert.match(page, /button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible\{outline:3px solid #1b874e;outline-offset:2px\}/);
   const hrefs = [...page.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map(([, href]) => href);
-  assert.deepEqual(hrefs, ['#main-content', 'academy.html']);
+  assert.deepEqual(hrefs, ['#main-content', 'https://www.unitree.com/g1/', 'https://www.universal-robots.com/products/', 'academy.html']);
+  assert.ok(hrefs.filter(href => href.startsWith('https://')).every(href => /^https:\/\/www\.(?:unitree\.com|universal-robots\.com)\//.test(href)), 'Only official manufacturer reference links are permitted');
   assert.doesNotMatch(app, /createElement\((['"])a\1\)/);
   assert.match(page, /\.skip-link\{[^}]*position:absolute;[^}]*top:-80px;[^}]*z-index:200/);
   assert.match(page, /\.skip-link:focus-visible\{top:12px\}/);
