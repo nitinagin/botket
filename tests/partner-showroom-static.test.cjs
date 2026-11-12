@@ -12,7 +12,10 @@ const checks = [
   ['no remote hosted manufacturer imagery', !/<img\b[^>]*src\s*=\s*['\"]https?:/i.test(html)],
   ['no misleading checkout', !/<form\b[^>]*action\s*=\s*['\"]https?:/i.test(html)],
   ['official manufacturer source links', html.includes('https://www.agibot.com/') && html.includes('https://x2-aimdk.agibot.com/en/dev/get_sdk/index.html') && html.includes('https://www.unitree.com/g1/') && html.includes('https://www.universal-robots.com/products/')],
+  ['three original inline SVG illustrations', (html.match(/<svg\\b/g) || []).length === 3 && !/<image\\b/i.test(html)],
+  ['no executable script tags', !/<script\\b/i.test(html)],
+  ['all external links use noopener noreferrer', [...html.matchAll(/<a\\b[^>]*target="_blank"[^>]*>/g)].every(([tag]) => /rel="noopener noreferrer"/.test(tag))],
   ['no claim of live robot city', /not a live playable deployment/i.test(html)],
 ];
 for (const [name, pass] of checks) { console.log((pass ? 'PASS' : 'FAIL') + ': ' + name); assert.ok(pass, name); }
-console.log('9/9 static showroom safety checks passed; browser and source verification still required.');
+console.log('12/12 static showroom safety checks passed; browser and source verification still required.');
