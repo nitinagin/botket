@@ -11,7 +11,7 @@ const checks = [
   ['manufacturer reference disclaimer', /manufacturer references only/i.test(html)],
   ['no remote hosted manufacturer imagery', !/<img\b[^>]*src\s*=\s*['\"]https?:/i.test(html)],
   ['no misleading checkout', !/<form\b[^>]*action\s*=\s*['\"]https?:/i.test(html)],
-  ['official manufacturer source links', html.includes('https://www.unitree.com/g1/') && html.includes('https://www.universal-robots.com/products/')],
+  ['official manufacturer source links', html.includes('https://www.agibot.com/') && html.includes('https://x2-aimdk.agibot.com/en/dev/get_sdk/index.html') && html.includes('https://www.unitree.com/g1/') && html.includes('https://www.universal-robots.com/products/')],
   ['no claim of live robot city', /not a live playable deployment/i.test(html)],
 ];
 for (const [name, pass] of checks) { console.log((pass ? 'PASS' : 'FAIL') + ': ' + name); assert.ok(pass, name); }
