@@ -43,3 +43,15 @@ test('featured model illustrations are disclosed and stock photos remain removed
     assert.ok(html.includes('not an exact depiction of ' + model), model);
   }
 });
+
+test('homepage local navigation and illustration paths resolve to repository files', () => {
+  const targets = [
+    ...html.matchAll(/\bhref=["']([^"'#?]+\.(?:html|svg))["']/g),
+    ...html.matchAll(/\bsrc=["']([^"']+\.svg)["']/g)
+  ].map(match => match[1]);
+  assert.ok(targets.length >= 10, 'expected homepage links and original illustrations');
+  for (const target of new Set(targets)) {
+    assert.ok(!target.startsWith('/') && !target.includes('..'), 'unsafe local path: ' + target);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', target)), 'missing local target: ' + target);
+  }
+});
