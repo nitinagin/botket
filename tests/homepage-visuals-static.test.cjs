@@ -21,3 +21,17 @@ test('internal fragment targets exist', () => {
   const ids = new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]));
   for (const m of html.matchAll(/href=["']#([^"']+)["']/g)) assert.ok(ids.has(m[1]), '#'+m[1]);
 });
+
+test('mobile navigation remains visible and horizontally scrollable', () => {
+  assert.match(html, /@media\s*\(max-width:720px\)/);
+  assert.match(html, /\.navlinks\s*\{display:flex;order:3;width:100%;gap:10px;overflow-x:auto/);
+  for (const target of ['investor-showroom.html', 'consumer.html', 'intelligence.html', 'community.html']) {
+    assert.ok(html.includes('href="' + target + '"'), target);
+  }
+});
+test('Robot City and manufacturer references disclose unverified capabilities', () => {
+  assert.match(html, /Playable deployment is not yet verified/);
+  assert.match(html, /not a confirmed BOTKET partner/);
+  assert.match(html, /not a playable screenshot/);
+  assert.match(html, /No verified simulation, AI training, hardware compatibility or purchasing transactions/);
+});
