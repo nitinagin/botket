@@ -35,3 +35,11 @@ test('Robot City and manufacturer references disclose unverified capabilities', 
   assert.match(html, /not a playable screenshot/);
   assert.match(html, /No verified simulation, AI training, hardware compatibility or purchasing transactions/);
 });
+
+test('featured model illustrations are disclosed and stock photos remain removed', () => {
+  assert.doesNotMatch(html, /pexels\.com|images\.unsplash\.com/i);
+  assert.equal((html.match(/class="model-card"/g) || []).length, 3);
+  for (const model of ['UR5e', 'CRX-10iA', 'Unitree Go2']) {
+    assert.ok(html.includes('not an exact depiction of ' + model), model);
+  }
+});
