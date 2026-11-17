@@ -6,8 +6,8 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 test('mobile viewport and original factory/Robot City art references', () => {
   assert.match(html, /name=["']viewport["']/);
-  assert.match(html, /assets\/robot-factory-concept\.svg/);
-  assert.match(html, /assets\/robot-city-concept\.svg/);
+  assert.ok(html.includes('assets/robot-factory-concept.svg'));
+  assert.ok(html.includes('assets/robot-city-concept.svg'));
 });
 test('manufacturer references have names and links', () => {
   for (const name of ['UR5e', 'CRX-10iA', 'Go2']) assert.ok(html.includes(name), name);
