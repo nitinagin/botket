@@ -64,3 +64,9 @@ test('inspection use case has its own original illustration, not Robot City art'
   assert.match(card, /quality inspection camera and conveyor illustration/);
   assert.doesNotMatch(card, /robot-city-concept\.svg/);
 });
+
+test('Robot City step does not imply a verified playable experience', () => {
+  assert.ok(html.includes('<h3>Explore Robot City development</h3>'));
+  assert.doesNotMatch(html, /<h3>Try Robot City<\/h3>/);
+  assert.ok(html.includes('playable testing is not yet verified'));
+});
