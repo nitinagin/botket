@@ -55,3 +55,12 @@ test('homepage local navigation and illustration paths resolve to repository fil
     assert.ok(fs.existsSync(path.join(__dirname, '..', target)), 'missing local target: ' + target);
   }
 });
+
+test('inspection use case has its own original illustration, not Robot City art', () => {
+  const inspection = html.match(/<strong>Inspection<\/strong>/);
+  assert.ok(inspection, 'inspection card is present');
+  const cardStart = html.lastIndexOf('<a class="case"', inspection.index);
+  const card = html.slice(cardStart, inspection.index);
+  assert.match(card, /quality inspection camera and conveyor illustration/);
+  assert.doesNotMatch(card, /robot-city-concept\.svg/);
+});
