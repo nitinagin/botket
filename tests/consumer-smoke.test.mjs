@@ -3535,3 +3535,54 @@ test('filtered My Robots selection has a safe one-click reveal action', () => {
   assert.doesNotMatch(handler, /selectedRobotId\s*=|mine\s*=|saveRobots\(|localStorage\./,
     'Revealing the selected profile must not change saved profiles or selection');
 });
+
+test('phone My Robots explains an empty demo list, keeps a 44px Skills handoff, and announces an unverified landing', () => {
+  const robots = page.match(/<section id="robots"[\s\S]*?<\/section>/)?.[0];
+  const skills = page.match(/<section id="skills"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(robots && skills, 'Expected My Robots and Skills sections');
+  assert.match(robots, /does not verify ownership or connect hardware/);
+  assert.match(robots, /id="openDiscoverFromRobots">Explore robot concepts →/);
+  assert.match(robots, /id="openSkillsFromRobots">Explore skill previews →/);
+  assert.match(robots, /<h3>Add a demo robot profile<\/h3>/);
+  assert.match(page, /\.next-step\{[^}]*box-sizing:border-box;[^}]*min-height:44px;[^}]*min-width:44px/);
+  assert.match(page, /#robots #continueSavedProfileToSkills,/);
+  assert.match(skills, /id="skillsRobotSummary" role="status"/);
+  assert.doesNotMatch(skills, /id="skillsRobotSummary"[^>]*aria-live="(?:off|assertive)"/);
+
+  const show = app.match(/function show\(tab,focusHeading=false\)\{[^\n]*\}/)?.[0] ?? '';
+  assert.match(show, /heading\.tabIndex=-1;heading\.focus\(\{preventScroll:true\}\)/);
+  assert.match(app, /const discoverRoute=byId\('openDiscoverFromRobots'\);if\(discoverRoute\)discoverRoute\.hidden=mine\.length>0;/);
+  assert.match(app, /byId\('openDiscoverFromRobots'\)\.onclick=\(\)=>show\('store'\)/);
+  assert.match(app, /byId\('openSkillsFromRobots'\)\.onclick=\(\)=>show\('skills'\)/);
+  assert.match(app, /byId\('continueSavedProfileToSkills'\)\.onclick=\(\)=>show\('skills'\)/);
+  assert.doesNotMatch(app, /byId\('openSkillsFromRobots'\)\.hidden/);
+  assert.match(app, /empty\.textContent='No demo robots added yet\.'/);
+  assert.match(app, /None of these actions verifies ownership, compatibility, or connects a device\./);
+  assert.match(app, /browse\.textContent='Explore robot concepts →';browse\.onclick=\(\)=>show\('store'\)/);
+
+  const summarySource = app.match(/function updateSkillsRobotSummary\(\)\{[^\n]*\}/)?.[0];
+  assert.ok(summarySource, 'Expected the Skills demo-profile summary');
+  const node = () => ({
+    children: [], attributes: {}, disabled: false, textContent: '', value: '',
+    replaceChildren() {}, append() {}, focus() {}
+  });
+  const elements = { skillRobotSelect: node(), skillsRobotSummary: node() };
+  const context = {
+    mine: [], selectedRobotId: null, byId: id => elements[id],
+    document: { createElement: node, activeElement: null }
+  };
+  const update = new Script('(' + summarySource + ')').runInNewContext(context);
+  update();
+  assert.match(elements.skillsRobotSummary.textContent, /No demo robot profiles saved/);
+  assert.match(elements.skillsRobotSummary.textContent, /Compatibility has not been checked; installation is unavailable/);
+  assert.doesNotMatch(elements.skillsRobotSummary.textContent, /ownership verified|device connected|compatible with your robot/i);
+  const profile = { id: 'demo-1', name: 'Home helper', brand: 'Example Robotics', model: 'Model A' };
+  context.mine = [profile, { id: 'demo-2', name: 'Garden Bot', brand: 'Example Maker', model: 'Model B' }];
+  context.selectedRobotId = 'demo-2';
+  update();
+  assert.match(elements.skillsRobotSummary.textContent, /Viewing generic skill previews for local demo profile: Garden Bot — Example Maker · Model B\./);
+  assert.match(elements.skillsRobotSummary.textContent, /Compatibility has not been checked; installation is unavailable/);
+  assert.match(elements.skillsRobotSummary.textContent, /no booking or eligibility verification occurs/);
+  assert.doesNotMatch(elements.skillsRobotSummary.textContent, /ownership verified|device connected|hardware connection confirmed/i);
+  assert.doesNotMatch(robots + '\n' + skills, /buy now|place order|payment method|card number|connect your robot|verified compatible|install now/i);
+});
