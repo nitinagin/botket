@@ -10,6 +10,7 @@
 .concept-card .concept-label{margin:0;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
 .concept-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
 .concept-actions button{flex:1 1 150px;min-height:44px}
+header img{display:block;width:150px;max-width:100%;height:auto}
 /* BOTKET mobile navigation v1 */
 @media (max-width: 640px) {
   /* Keep the footer and its Academy link above the fixed mobile navigation. */
@@ -88,12 +89,35 @@
   #store > .grid { margin-top: 4px; }
   .concept-card { gap: 8px; padding: 12px 14px; }
   .concept-card h3 { margin: 0; }
-  /* At 320x640, with the section heading at the top, Create demo profile sat about 14px under the fixed bottom nav. */
+  /* At 390px each concept action was 158px wide, so "Create demo profile →" wrapped the arrow onto its own line. */
+  .concept-actions button { box-sizing: border-box; padding: 10px 6px; }
+  /* At 320x640 the first concept card started below the screen, and Add to demo cart sat 257px under the fixed bottom nav. The illustrative price also wrapped onto a second line. */
   @media (max-width: 359px) {
-    #store > p.muted { margin-bottom: 2px; }
-    #store .store-filters { margin-bottom: 2px; }
-    #store > .grid { margin-top: 0; }
-    .concept-card { gap: 4px; padding: 4px 12px 8px; }
+    body:has(#store:not([hidden])) header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    body:has(#store:not([hidden])) header img { width: 72px; height: auto; }
+    main:has(#store:not([hidden])) { padding-top: 4px; }
+    main:has(#store:not([hidden])) > h1 { font-size: 22px; line-height: 1.1; margin: 0 0 2px; }
+    main:has(#store:not([hidden])) > p { margin: 0; font-size: 13px; line-height: 1.25; }
+    #store > h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.15; }
+    #store > p.muted { margin: 0; font-size: 13px; line-height: 1.25; }
+    #store .store-filters { margin: 2px 0; gap: 4px; flex-wrap: nowrap; }
+    #store .store-filters button { flex: 1 1 0; padding: 4px 2px; font-size: 12px; line-height: 1.1; }
+    #store > label { margin: 0; font-size: 13px; line-height: 1.2; }
+    #store #robotSearch { width: 100%; }
+    #store #filterSummary { margin: 0; font-size: 12px; line-height: 1.2; }
+    #store > .grid { margin: 2px 0 0; }
+    .concept-card { gap: 2px; padding: 6px 10px 6px; }
+    .concept-card h3 { font-size: 16px; line-height: 1.2; }
+    .concept-card .concept-price { font-size: 1rem; line-height: 1.2; padding: 4px 8px; }
+    .concept-actions { gap: 4px; }
+    .concept-actions button { margin-top: 0; }
   }
   /* At 390px Discover category chips were 39px tall, concept search was 37px tall, and Clear search, Show all, and Review demo cart were 39px. */
   #store .store-filters button,
@@ -222,7 +246,7 @@ input:disabled,select:disabled,#skillcards button:disabled{opacity:1;color:#111;
 </style>
 <link rel="icon" type="image/svg+xml" href="assets/botket-logo.svg"></head><body>
 <a class="skip-link" href="#main-content">Skip to consumer platform</a>
-<header><img src="assets/botket-logo.svg" alt="BOTKET" style="display:block;width:150px;max-width:100%;height:auto" /> · Personal Robotics Platform</header>
+<header><img src="assets/botket-logo.svg" alt="BOTKET" /> · Personal Robotics Platform</header>
 <main id="main-content" tabindex="-1"><h1>Discover. Preview. Explore.</h1><p>Explore robot concepts, skill previews and service previews in one place.</p><p class="muted">Prototype only: sample listings and prices. Checkout creates an order preview only; no purchases, payments, verified compatibility or device connections.</p>
 <nav class="tabs" aria-label="Platform sections"><button type="button" class="active" data-tab="store" aria-controls="store" aria-current="page"><span class="nav-label">Discover</span></button><button type="button" data-tab="cart" aria-controls="cart"><span class="nav-label">Checkout</span> <span class="nav-count">(<span id="count">0</span>)</span></button><button type="button" data-tab="robots" aria-controls="robots"><span class="nav-label">My Robots</span></button><button type="button" data-tab="skills" aria-controls="skills"><span class="nav-label">Skills</span></button><button type="button" data-tab="services" aria-controls="services"><span class="nav-label">Services</span></button></nav>
 <section id="store" aria-labelledby="store-title"><h2 id="store-title">Explore robots</h2><p class="muted">Illustrative concepts only. No products are available to order through this demo.</p><div class="store-filters" role="group" aria-label="Robot category filters"><button type="button" data-category="all" aria-pressed="true">All robots</button><button type="button" data-category="home" aria-pressed="false">Home</button><button type="button" data-category="companion" aria-pressed="false">Companion</button><button type="button" data-category="education" aria-pressed="false">Education</button></div><label for="robotSearch">Find robot concepts <input id="robotSearch" type="search" maxlength="80" placeholder="Search concept or category" autocomplete="off" aria-describedby="filterSummary" aria-controls="products"></label><button type="button" id="clearRobotSearch" hidden aria-label="Clear robot concept search">Clear search</button><p id="filterSummary" class="hint" role="status" aria-live="polite"></p><button type="button" id="resetDiscoverFilters" hidden>Show all robot concepts</button><div class="grid" id="products" aria-label="Robot concept search results"></div><p><button type="button" id="reviewDiscoverCart" hidden>Review demo cart →</button></p><p id="discoverOwnedRobotNotice" class="hint">Already have a robot? You can create a local demo profile without using checkout. No ownership or compatibility verification, and no device connection.</p><p><button type="button" id="openRobotsFromDiscover" aria-describedby="discoverOwnedRobotNotice">Create local demo profile →</button></p></section>
