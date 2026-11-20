@@ -2716,6 +2716,24 @@ test('mobile Services keeps both recovery actions readable before the preview li
   assert.match(services, /Generic service previews/);
 });
 
+test('phone checkout explains an empty cart, keeps a 44px My Robots handoff, and does not create a profile', () => {
+  const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
+  assert.match(mobile, /#cart #preview,\s*#cart #checkoutToRobots \{ box-sizing: border-box; min-height: 44px; min-width: 44px; \}/);
+  assert.match(page, /#items > button\{[^}]*min-height:44px/);
+  assert.match(app, /Your cart is empty\. No order was placed\. Press Open My Robots \(demo profiles\)\. This does not connect a device\./);
+  assert.match(app, /browse\.textContent=lastBrowseTab==='services'\?'Browse service previews →':'Browse demo robots →'/);
+  assert.match(app, /browse\.setAttribute\('data-cart-browse',''\);browse\.onclick=\(\)=>show\(lastBrowseTab\)/);
+  const handoff = app.match(/byId\('checkoutToRobots'\)\.onclick=(\(\)=>\{[^\n]*\});/)?.[1] ?? '';
+  assert.match(handoff, /show\('robots'\)/);
+  assert.match(handoff, /Checkout was a demo preview for /);
+  assert.match(handoff, /does not confirm purchase, ownership, compatibility or hardware connection/);
+  assert.doesNotMatch(handoff, /mine\.push|addDemoRobot|localStorage/);
+  assert.doesNotMatch(handoff, /card number|payment method|buy now/i);
+  assert.match(page, /id="robotMessage" role="status"/);
+  assert.match(app, /const heading=byId\(tab\)\.querySelector\('h2'\);if\(heading\)\{heading\.tabIndex=-1;heading\.focus\(\{preventScroll:true\}\)/);
+  assert.doesNotMatch(page, /<input[^>]+(?:autocomplete="cc-|name="card|placeholder="Card)/i);
+});
+
 test('mobile empty Checkout keeps both recovery actions above the fixed bottom nav', () => {
   const mobile = page.slice(page.indexOf('@media (max-width: 640px)'), page.indexOf('/* Keyboard-first'));
   assert.match(mobile, /At 390px both empty Checkout recovery actions sat under the fixed bottom nav/);
