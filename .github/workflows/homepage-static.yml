@@ -1,0 +1,39 @@
+name: Homepage static regression
+
+on:
+  pull_request:
+    paths:
+      - index.html
+      - robot-city.html
+      - assets/robot-factory-concept.svg
+      - assets/robot-city-concept.svg
+      - tests/homepage-visuals-static.test.cjs
+      - .github/workflows/homepage-static.yml
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - robot-city.html
+      - assets/robot-factory-concept.svg
+      - assets/robot-city-concept.svg
+      - tests/homepage-visuals-static.test.cjs
+      - .github/workflows/homepage-static.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  homepage-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Run homepage source regression tests
+        run: node --test tests/homepage-visuals-static.test.cjs
